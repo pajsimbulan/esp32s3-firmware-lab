@@ -23,7 +23,7 @@
 #include "driver/i2c_master.h"
 #include "protocol_examples_common.h"
 
-#define HOST_IP "192.168.1.50" // LAPTOP IP
+#define HOST_IP "172.20.10.5" // LAPTOP IP
 #define FIRMWARE_URL "http://" HOST_IP ":8070/lab15_ota.bin"
 #define HEALTH_URL "http://" HOST_IP ":8070/health"
 
@@ -32,7 +32,7 @@
 #define MPU_ADDR 0x68
 #define MPU_WHO_AM_I 0x75
 
-#define FW_VERSION "v1-baseline"
+#define FW_VERSION "v2-good"
 
 static i2c_master_dev_handle_t s_mpu = NULL;
 
