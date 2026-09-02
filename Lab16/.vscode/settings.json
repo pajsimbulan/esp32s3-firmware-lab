@@ -1,0 +1,31 @@
+{
+  "idf.espIdfPath": "C:\\esp\\v5.5.5\\esp-idf",
+  "idf.toolsPath": "C:\\Espressif",
+  "idf.pythonBinPath": "C:\\Espressif\\tools\\python\\v5.5.5\\venv\\Scripts\\python.exe",
+  "idf.extensionActivationMode": "always",
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "cmake.configureOnOpen": false,
+  "cmake.configureOnEdit": false,
+  "cmake.automaticReconfigure": false,
+  "cmake.autoSelectActiveFolder": false,
+  "cmake.options.advanced": {
+    "build": {
+      "statusBarVisibility": "inherit",
+      "inheritDefault": "hidden"
+    },
+    "launch": {
+      "statusBarVisibility": "inherit",
+      "inheritDefault": "hidden"
+    },
+    "debug": {
+      "statusBarVisibility": "inherit",
+      "inheritDefault": "hidden"
+    }
+  },
+  "clangd.path": "C:\\Espressif\\tools\\esp-clang\\esp-19.1.2_20250312\\esp-clang\\bin\\clangd.exe",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=**",
+    "--compile-commands-dir=c:\\Users\\pajsi\\Codes\\esp32s3-firmware-lab\\Lab16\\build"
+  ]
+}
