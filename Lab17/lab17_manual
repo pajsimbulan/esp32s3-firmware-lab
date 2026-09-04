@@ -1,0 +1,707 @@
+# Lab 17 · The Automotive Bus: CAN (TWAI) — Broadcast by Message ID
+
+**Time:** 2–3 hrs · **Parts:** 1 jumper (Part A) · **Proves:** CAN framing, bit timing, hardware filtering, bus-off recovery · **Rebuilt v5.4:** frame anatomy added, bit timing added, stale expected-output corrected, `g_arb_lost` declared
+
+> **[KEY POINT] How this lab is structured**
+>
+> Concept, then **Phase 0 configure**, **Phase 1 the complete code**, walkthrough, **Phase 2 build and run**, **Phase 3 prove it**, then worked extensions. Every file is given in full. Nothing is undefined and nothing is left for you to work out.
+
+> **[NOTE] What changed from v5.3**
+>
+> Five defects were found and fixed:
+>
+> | # | Defect | Fix |
+> |---|---|---|
+> | 1 | No frame diagram, though §17.3 referenced fields by name | New **§17.3.1** frame anatomy |
+> | 2 | `TWAI_TIMING_CONFIG_500KBITS()` used with no explanation of bit timing at all | New **§17.4** bit timing, and **proof case 5** measures it |
+> | 3 | Bit stuffing never mentioned | Covered in **§17.4.3** |
+> | 4 | §17.7 expected output read `filtering for 0x123`; the code logs the code and mask too | Expected output corrected to match §17.5 exactly |
+> | 5 | §17.9 arbitration extension incremented `g_arb_lost`, which was never declared | Declaration given in **§17.10.1** |
+
+## 17.1 Objective & TM4C bridge
+
+Send and receive CAN frames. CAN runs cars, industrial machinery and a good deal of aerospace, so it is the bus to know for the automotive and defense tiers on your target list — Tesla, Anduril and the primes all live on it.
+
+> **[TM4C BRIDGE]**
+>
+> The TM4C had a CAN controller configured through its own registers. The message-ID-plus-acceptance-filter model is identical; here it is wrapped in setup macros. One naming note: Espressif calls its CAN peripheral **TWAI** (Two-Wire Automotive Interface) for trademark reasons. Every `twai_*` function is CAN.
+
+## 17.2 Parts & wiring
+
+| Part | Needs | Status |
+|---|---|---|
+| **A — self-test** | Board + one jumper, GPIO5 to GPIO4 | have it |
+| **B — real bus** | 2 boards, 2× SN65HVD230, 2× 120 Ω | ~$10 |
+
+| ESP32 (each node) | SN65HVD230 | Bus |
+|---|---|---|
+| GPIO5 (TX) | TXD | CAN_H to CAN_H, CAN_L to CAN_L between nodes, with a 120 Ω resistor across H–L at **each end** |
+| GPIO4 (RX) | RXD | |
+| 3V3 | VCC | |
+| GND | GND | |
+
+> **[WARNING] Buy the 3.3 V transceiver**
+>
+> **SN65HVD230** is a 3.3 V part and correct for the ESP32. The very common **MCP2551** is 5 V; its RXD output can exceed the ESP32's 3.3 V limit, and the S3's pins are **not** 5 V tolerant. This is the single most common way people damage a board on a CAN lab, and it is a one-word difference in the part number.
+
+## 17.3 Concept
+
+### 17.3.1 The frame — what is actually on the wire
+
+This section was missing from v5.3. The rest of §17.3 refers to the identifier, the ACK slot and the DLC by name, so here is the layout they live in. Standard frame, 11-bit identifier, data frame:
+
+```text
+ bits:   1        11        1     1    1     4        0..64        15    1   1    1      7
+       +----+------------+-----+----+----+------+--------------+-------+---+---+----+---------+
+       |SOF | identifier | RTR |IDE | r0 | DLC  |     data     |  CRC  |del|ACK|del|   EOF   |
+       +----+------------+-----+----+----+------+--------------+-------+---+---+----+---------+
+        |    \__________________/         \____________________/
+        |     arbitration field            payload, DLC bytes
+        |     lower ID wins the bus        0 to 8 bytes
+        |
+        dominant bit, wakes every node
+```
+
+| Field | Bits | What it does |
+|---|---|---|
+| **SOF** | 1 | Start of frame. A single dominant bit; every node hard-synchronizes on its falling edge. |
+| **Identifier** | 11 | **The message name, not a destination.** Also the priority — see §17.3.2. |
+| **RTR** | 1 | Remote transmission request. `0` = data frame, `1` = "somebody please send this ID." |
+| **IDE** | 1 | Identifier extension. `0` = standard 11-bit, `1` = extended 29-bit. This is `.extd` in `twai_message_t`. |
+| **r0** | 1 | Reserved, transmitted dominant. |
+| **DLC** | 4 | Data length code, the payload byte count, 0 to 8. This is `.data_length_code`. |
+| **Data** | 0–64 | The payload. DLC × 8 bits. |
+| **CRC** | 15 (+1 delimiter) | Computed over everything from SOF through the data field. |
+| **ACK** | 1 (+1 delimiter) | Transmitter sends recessive; **any** receiver that got a good CRC overwrites it dominant. See §17.3.3. |
+| **EOF** | 7 | Seven recessive bits ending the frame. |
+
+**Extended frames** replace the 11-bit ID with 29 bits and insert **SRR** and **IDE** between the two ID halves. `.extd = 1` in `twai_message_t` selects this. Everything else in the lab is unchanged.
+
+> **[KEY POINT] The one line to carry into an interview**
+>
+> **There is no receiver address anywhere in the frame.** The identifier names the *message*. Every node hears every frame and decides — in hardware, via the acceptance filter in §17.6 — whether it cares. That is the single biggest structural difference from I²C, where the first byte is a device address.
+
+### 17.3.2 Arbitration — how the ID becomes the priority
+
+The bus has two states. **Recessive** is idle, both lines resting near 2.5 V, differential ≈ 0 V, logic **1**. **Dominant** is driven, differential ≈ 2 V, logic **0**. A dominant bit from any node overrides a recessive bit from every other node. This is the same open-drain, wired-AND arrangement as I²C.
+
+```text
+ 3.5 V ─ ─ ─ ─ ─ ─ ─┌──────────┐─ ─ ─ ─ ─ ─ ─ ┌──────────┐─ ─ ─   CAN_H
+                    │          │              │          │
+ 2.5 V ─────────────┘          └──────────────┘          └──────  idle level
+                    ┐          ┌              ┐          ┌
+ 1.5 V ─ ─ ─ ─ ─ ─ ─└──────────┘─ ─ ─ ─ ─ ─ ─ └──────────┘─ ─ ─   CAN_L
+
+ state:  recessive   dominant    recessive     dominant   recessive
+ logic:      1           0           1             0          1
+```
+
+Now, as nodes transmit their identifiers bit by bit, **each one also listens to the bus**. A node that transmits a recessive 1 but hears a dominant 0 knows another node with a lower ID is transmitting, so it immediately stops and becomes a receiver.
+
+The result: the lower ID wins, **the winner's transmission is completely unaffected** — it does not even know a contest happened — and the loser retries automatically as soon as the bus is idle. No data is corrupted and no bandwidth is wasted.
+
+Compare Ethernet's classic approach, where a collision is detected only *after* both messages are already ruined, and both sides then wait a random interval and retry. CAN's scheme resolves contention before any damage occurs, which is what allows you to reason about worst-case latency — the thing a real-time control bus actually needs.
+
+**So the ID is the priority.** That is a design decision you make when you lay out a system: safety-critical messages get low IDs so nothing can delay them.
+
+### 17.3.3 Acknowledgement, and why a lone board needs NO_ACK
+
+Every CAN frame must be **acknowledged by at least one other node**. Receivers assert a dominant bit in the ACK slot to confirm they heard it, which gives the transmitter genuine feedback that somebody is listening — something I²C also provides per byte and SPI provides not at all.
+
+It also means a single board with nothing else on the bus will report errors indefinitely, because nobody acknowledges it. After enough consecutive errors the controller takes itself off the bus entirely, a state called **bus-off** — the protocol deliberately removing a node it believes is faulty.
+
+`TWAI_MODE_NO_ACK` waives the acknowledgement requirement so one board can test itself. That is why Part A works, and understanding *why the mode exists* is worth more than the mode itself.
+
+### 17.3.4 Frames are small on purpose
+
+A CAN frame carries **0 to 8 bytes**. That looks stingy until you consider what it buys: short frames mean short, *bounded* transmission times, which is what lets you calculate the worst-case delay for a high-priority message on a loaded bus. A protocol that allowed large payloads would let one long frame delay a brake message unpredictably.
+
+CAN is a real-time control bus, not a file-transfer link, and every design choice in it trades throughput for predictability. **CAN FD** is the modern extension that allows 64-byte payloads and a faster data phase for applications that need more, and it is worth knowing by name.
+
+## 17.4 Bit timing — the section v5.3 was missing
+
+`app_main` contains one line that v5.3 never explained:
+
+```c
+twai_timing_config_t t = TWAI_TIMING_CONFIG_500KBITS();
+```
+
+That macro hides the entire bit-timing model. It works in Part A because a node in loopback only has to agree with itself. **On a real two-node bus it is the first thing that breaks**, and it is the question that follows "explain CAN arbitration" in an interview.
+
+### 17.4.1 One bit is divided into time quanta
+
+```text
+        |<------------------ one nominal bit time ------------------>|
+        +-------+---------------+-----------------+-----------------+
+        | SYNC  |   PROP_SEG    |   PHASE_SEG1    |   PHASE_SEG2    |
+        | 1 Tq  |    1-8 Tq     |     1-8 Tq      |     1-8 Tq      |
+        +-------+---------------+-----------------+-----------------+
+                                                  ^
+                                            SAMPLE POINT
+                                       the bus is read exactly here
+```
+
+| Segment | Purpose |
+|---|---|
+| **SYNC** | Always 1 Tq. The edge is expected to fall here. Hard synchronization on SOF happens against this segment. |
+| **PROP_SEG** | Covers physical round-trip delay: cable, both transceivers, and back. This is what limits bus length — see §17.4.4. |
+| **PHASE_SEG1 / PHASE_SEG2** | Absorb oscillator drift between nodes. Resynchronization lengthens SEG1 or shortens SEG2 by up to **SJW** quanta. |
+
+The **sample point** sits at the SEG1/SEG2 boundary, conventionally **75% to 87.5%** through the bit. Every node on the bus must sample at close to the same place, because arbitration requires two nodes to agree, bit by bit, about what is on the wire at that instant.
+
+### 17.4.2 The arithmetic
+
+One time quantum is the peripheral clock divided by the prescaler:
+
+```text
+    Tq        = brp / f_src
+
+    bit time  = (1 + tseg_1 + tseg_2) x Tq          <- the 1 is SYNC
+
+    bit rate  = 1 / bit time
+                = f_src / (brp x (1 + tseg_1 + tseg_2))
+
+    sample point = (1 + tseg_1) / (1 + tseg_1 + tseg_2)
+```
+
+On the ESP32-S3 the TWAI source clock is **APB at 80 MHz**.
+
+**[DERIVED]** For `TWAI_TIMING_CONFIG_500KBITS()` with `brp = 8`, `tseg_1 = 15`, `tseg_2 = 4`:
+
+```text
+    Tq           = 8 / 80 MHz          = 100 ns
+    total quanta = 1 + 15 + 4          = 20 Tq
+    bit time     = 20 x 100 ns         = 2.0 us
+    bit rate     = 1 / 2.0 us          = 500 kbit/s        <- checks out
+    sample point = 16 / 20             = 80%
+```
+
+**[DERIVED]** For `TWAI_TIMING_CONFIG_125KBITS()` with `brp = 32` and the same segments:
+
+```text
+    Tq           = 32 / 80 MHz         = 400 ns
+    bit time     = 20 x 400 ns         = 8.0 us
+    bit rate     = 125 kbit/s
+    sample point = 80%                 <- unchanged; only the prescaler moved
+```
+
+> **[NOTE] Confirm the segment values against your own header**
+>
+> The `brp` and `tseg` numbers above are the ESP-IDF v5.5 values for the ESP32-S3 and are quoted so you can follow the arithmetic. Confirm them yourself rather than trusting the page:
+>
+> ```text
+> Select-String -Path "$env:IDF_PATH\components\hal\include\hal\twai_types.h" -Pattern "TIMING_CONFIG_500KBITS" -Context 0,3
+> ```
+>
+> The **2.0 µs bit time is definitional** — it follows from 500 kbit/s regardless of how the segments are split — so proof case 5 stands even if your header divides the quanta differently.
+
+### 17.4.3 Why there is no clock line — bit stuffing
+
+CAN has two wires and neither is a clock. Unlike I²C's SCL, receivers recover timing from the **edges in the data itself**, resynchronizing on every recessive-to-dominant transition.
+
+A long run of identical bits has no edges, and the receivers would drift. So after **five consecutive identical bits the transmitter inserts one bit of the opposite polarity**, which receivers remove. This is **bit stuffing**, and it applies from SOF through the CRC field.
+
+Two consequences worth knowing:
+
+- **Frame length is not fixed.** A worst-case standard data frame with 8 bytes runs about 130 bits on the wire rather than the 111 the field table sums to. Your worst-case latency math has to use the stuffed length.
+- **Six identical bits in a row is illegal**, which is exactly how an error frame is signalled: a node that detects a problem deliberately transmits six dominant bits, violating the rule on purpose so every other node sees it immediately.
+
+### 17.4.4 Bit rate and bus length are coupled
+
+PROP_SEG must cover the round trip: a bit must reach the far end of the bus and back within one bit time, because that is what arbitration requires. Signal propagation is roughly 5 ns/m each way in twisted pair, plus transceiver loop delay.
+
+| Bit rate | Bit time | Practical max bus length |
+|---|---|---|
+| 1 Mbit/s | 1.0 µs | ~40 m |
+| 500 kbit/s | 2.0 µs | ~100 m |
+| 250 kbit/s | 4.0 µs | ~250 m |
+| 125 kbit/s | 8.0 µs | ~500 m |
+
+This is why a vehicle powertrain bus runs at 500 kbit/s and a long industrial run drops to 125. It is not a bandwidth choice, it is a geometry choice.
+
+> **[KEY POINT] The failure mode this section prevents**
+>
+> Two nodes at different bit rates produce a bus where **nothing is ever acknowledged**. The transmitter's error counter climbs, it goes error-passive, then bus-off — which looks exactly like a wiring fault, a missing terminator, or a dead transceiver.
+>
+> When you build Part B, check the bit rate on both nodes *before* you check anything physical. It is the cheapest test and the most likely cause.
+
+## 17.5 Phase 0 — configure
+
+Three files in the **project root** (the folder holding the top-level `CMakeLists.txt`).
+
+### 0.1 — sdkconfig.defaults
+
+```text
+CONFIG_IDF_TARGET="esp32s3"
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+```
+
+That is all. TWAI needs no special Kconfig — unlike Lab 15, there is no hidden switch here that silently disables the feature.
+
+### 0.2 — top-level CMakeLists.txt
+
+```cmake
+cmake_minimum_required(VERSION 3.16)
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+project(lab17_can)
+```
+
+### 0.3 — main/CMakeLists.txt
+
+```cmake
+idf_component_register(SRCS "main.c"
+                       INCLUDE_DIRS ".")
+```
+
+### 0.4 — apply and verify
+
+```text
+Remove-Item sdkconfig -ErrorAction SilentlyContinue
+idf.py fullclean
+idf.py set-target esp32s3
+idf.py reconfigure
+idf.py build
+```
+
+If it builds, Phase 0 is done. There is nothing to grep for in this lab.
+
+### 0.5 — wiring
+
+| Part | Wiring | Mode |
+|---|---|---|
+| **A** (do this first) | One jumper: **GPIO5 to GPIO4**. Nothing else. | `TWAI_MODE_NO_ACK` |
+| **B** (optional, needs parts) | Two boards, each with an **SN65HVD230**, CAN_H to CAN_H, CAN_L to CAN_L, **120 Ω at each end** | `TWAI_MODE_NORMAL` |
+
+## 17.6 Phase 1 — the complete main.c
+
+> **[WARNING] Read this before you flash: NO_ACK is not the same as self-reception**
+>
+> These are **two separate settings** and the loopback needs both. Espressif's own self-test example uses the No Acknowledge Mode *and* Self Reception Request.
+>
+> | Setting | Where | What it does |
+> |---|---|---|
+> | `TWAI_MODE_NO_ACK` | the *driver* config | A transmission counts as successful **without** an ACK from another node. Without this, a lone board goes bus-off in about a second. |
+> | `.self = 1` | each *message* | Asks the controller to also **receive its own transmission**. Without this, `twai_transmit()` succeeds and `twai_receive()` times out. |
+>
+> Set only the mode — which an earlier edition of this lab did — and you get the confusing symptom of `tx_ok` climbing while `rx_ok` stays at zero, with no error anywhere. `.flags = TWAI_MSG_FLAG_SELF` is the older spelling of the same bit and still works.
+
+```c
+// ============================================================================
+//  Lab 17 -- CAN / TWAI                                            (v5.4)
+//
+//  Goal:   Send and receive a CAN frame on one board, filter in hardware,
+//          watch the error counters, force bus-off and recover from it.
+//  Verify: rx_ok tracks tx_ok with the jumper fitted. Changing the TX id to
+//          OTHER_ID makes rx_ok stop while tx_ok keeps climbing.
+//  Gotcha: NO_ACK mode and .self = 1 are DIFFERENT things. You need both.
+//          In the mask, a 1 bit means DON'T CARE -- inverted from intuition.
+//
+//  Part A: jumper GPIO5 -> GPIO4. No transceiver, no second board.
+// ============================================================================
+#include <stdio.h>
+#include <string.h>
+#include <inttypes.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "driver/twai.h"
+#include "esp_log.h"
+
+#define TX_PIN      GPIO_NUM_5
+#define RX_PIN      GPIO_NUM_4
+#define MY_ID       0x123        // the ID this node transmits and accepts
+#define OTHER_ID    0x456        // used in proof case 2 to show the filter rejecting
+
+// ---- acceptance filter arithmetic (LEGACY twai_* API, ESP-IDF 5.x) -------
+// A single filter with 11-bit standard IDs expects the ID in the TOP 11 bits
+// of a 32-bit word, i.e. shifted left by 21:   0x123 -> 0x24600000
+//
+// In the MASK, a 1 bit means "DON'T CARE". That is inverted from what most
+// people assume. The low 21 bits are unused padding below the ID, so they are
+// always don't-care.  All-11-ID-bits-zero => every ID bit must match exactly.
+//
+// NOTE for later: ESP-IDF v6's NEW node API reverses this convention -- there
+// a mask '1' means "must match". If you ever port this, re-read the docs.
+// -----------------------------------------------------------------------
+#define FILTER_CODE(id)   ((uint32_t)(id) << 21)
+#define FILTER_MASK_EXACT 0x001FFFFFu
+
+static const char *TAG = "lab17";
+
+// Counters. g_arb_lost is declared here rather than in the extension, so the
+// extension in 17.10.1 is a two-line edit and not a compile error.
+static uint32_t g_tx_ok, g_tx_fail, g_rx_ok, g_busoff, g_recovered, g_arb_lost;
+
+// ---------------------------------------------------------------- helpers
+static const char *state_name(twai_state_t s)
+{
+    switch (s) {
+        case TWAI_STATE_STOPPED:    return "STOPPED";
+        case TWAI_STATE_RUNNING:    return "RUNNING";
+        case TWAI_STATE_BUS_OFF:    return "BUS_OFF";
+        case TWAI_STATE_RECOVERING: return "RECOVERING";
+        default:                    return "?";
+    }
+}
+
+static void log_status(const char *why)
+{
+    twai_status_info_t st;
+    if (twai_get_status_info(&st) != ESP_OK) return;
+    ESP_LOGI(TAG, "[%s] state=%s tx_err=%" PRIu32 " rx_err=%" PRIu32
+                  " tx_q=%" PRIu32 " rx_q=%" PRIu32,
+             why, state_name(st.state),
+             st.tx_error_counter, st.rx_error_counter,
+             st.msgs_to_tx, st.msgs_to_rx);
+}
+
+// ---------------------------------------------------------------- TX task
+static void tx_task(void *arg)
+{
+    (void)arg;
+    uint8_t counter = 0;
+
+    for (;;) {
+        twai_message_t tx = {
+            .identifier       = MY_ID,
+            .data_length_code = 4,
+            .self             = 1,     // <-- SELF RECEPTION. Without this the
+            .data             = { 0xDE, 0xAD, 0xBE, counter },  // rx queue stays empty.
+        };
+        // .extd stays 0 = standard 11-bit ID;  .rtr 0 = data frame, not a request
+
+        esp_err_t err = twai_transmit(&tx, pdMS_TO_TICKS(1000));
+        if (err == ESP_OK) {
+            g_tx_ok++;
+        } else {
+            g_tx_fail++;
+            ESP_LOGW(TAG, "tx failed: %s", esp_err_to_name(err));
+        }
+        counter++;
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+}
+
+// ---------------------------------------------------------------- RX task
+static void rx_task(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        twai_message_t rx;
+        esp_err_t err = twai_receive(&rx, pdMS_TO_TICKS(2000));
+
+        if (err == ESP_OK) {
+            g_rx_ok++;
+            char buf[3 * 8 + 1] = {0};
+            for (int i = 0; i < rx.data_length_code && i < 8; i++)
+                sprintf(buf + i * 3, "%02X ", rx.data[i]);
+            ESP_LOGI(TAG, "RX id=0x%03" PRIX32 " dlc=%d data=[ %s]",
+                     rx.identifier, rx.data_length_code, buf);
+        } else if (err == ESP_ERR_TIMEOUT) {
+            ESP_LOGW(TAG, "no frame in 2 s");   // real information on a bus
+        } else {
+            ESP_LOGE(TAG, "rx error: %s", esp_err_to_name(err));
+        }
+    }
+}
+
+// ------------------------------------------------------- alert / recovery
+// The task that turns a demo into a node you could ship.
+static void alert_task(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        uint32_t alerts;
+        if (twai_read_alerts(&alerts, pdMS_TO_TICKS(1000)) != ESP_OK) continue;
+
+        if (alerts & TWAI_ALERT_ERR_PASS)
+            ESP_LOGW(TAG, "ERROR PASSIVE -- an error counter passed 127");
+        if (alerts & TWAI_ALERT_BUS_ERROR)
+            ESP_LOGW(TAG, "bus error detected");
+        if (alerts & TWAI_ALERT_TX_FAILED)
+            ESP_LOGW(TAG, "a transmission failed after retries");
+        if (alerts & TWAI_ALERT_RX_QUEUE_FULL)
+            ESP_LOGW(TAG, "rx queue full -- frames were dropped");
+
+        if (alerts & TWAI_ALERT_BUS_OFF) {
+            g_busoff++;
+            ESP_LOGE(TAG, "BUS-OFF. the node removed itself from the bus");
+            log_status("bus-off");
+            // Recovery MUST be initiated from task context, never an ISR.
+            // The controller then waits for 128 occurrences of 11 recessive
+            // bits before rejoining -- that is the CAN standard, not IDF.
+            vTaskDelay(pdMS_TO_TICKS(100));
+            esp_err_t e = twai_initiate_recovery();
+            if (e != ESP_OK) ESP_LOGE(TAG, "recovery start failed: %s",
+                                      esp_err_to_name(e));
+        }
+
+        if (alerts & TWAI_ALERT_BUS_RECOVERED) {
+            g_recovered++;
+            ESP_LOGW(TAG, "recovered. restarting the driver");
+            // Recovery leaves the driver STOPPED, not RUNNING. Miss this and
+            // the node sits silent forever, looking like it never recovered.
+            esp_err_t e = twai_start();
+            if (e != ESP_OK) ESP_LOGE(TAG, "restart failed: %s",
+                                      esp_err_to_name(e));
+            log_status("recovered");
+        }
+    }
+}
+
+// ---------------------------------------------------------------- stats
+static void stats_task(void *arg)
+{
+    (void)arg;
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(5000));
+        ESP_LOGW(TAG, "tx_ok=%" PRIu32 " tx_fail=%" PRIu32 " rx_ok=%" PRIu32
+                      " bus_off=%" PRIu32 " recovered=%" PRIu32,
+                 g_tx_ok, g_tx_fail, g_rx_ok, g_busoff, g_recovered);
+        log_status("periodic");
+    }
+}
+
+// ---------------------------------------------------------------- app_main
+void app_main(void)
+{
+    twai_general_config_t g =
+        TWAI_GENERAL_CONFIG_DEFAULT(TX_PIN, RX_PIN, TWAI_MODE_NO_ACK);
+    g.alerts_enabled = TWAI_ALERT_ERR_PASS | TWAI_ALERT_BUS_ERROR |
+                       TWAI_ALERT_TX_FAILED | TWAI_ALERT_RX_QUEUE_FULL |
+                       TWAI_ALERT_BUS_OFF  | TWAI_ALERT_BUS_RECOVERED;
+    g.rx_queue_len = 10;
+    g.tx_queue_len = 10;
+
+    // 500 kbit/s = 20 Tq of 100 ns, sample point at 80%. See 17.4.
+    // Proof case 5 swaps this for TWAI_TIMING_CONFIG_125KBITS().
+    twai_timing_config_t t = TWAI_TIMING_CONFIG_500KBITS();
+
+    twai_filter_config_t f = {
+        .acceptance_code = FILTER_CODE(MY_ID),
+        .acceptance_mask = FILTER_MASK_EXACT,
+        .single_filter   = true,
+    };
+
+    ESP_ERROR_CHECK(twai_driver_install(&g, &t, &f));
+    ESP_ERROR_CHECK(twai_start());
+    ESP_LOGI(TAG, "TWAI up at 500 kbit/s, accepting only 0x%03X "
+                  "(code 0x%08" PRIX32 ", mask 0x%08" PRIX32 ")",
+             MY_ID, FILTER_CODE(MY_ID), (uint32_t)FILTER_MASK_EXACT);
+    log_status("start");
+
+    // Check every task creation. A silent failure here shows up later as a
+    // mystery -- no frames received, or no alerts handled, with no clue why.
+    BaseType_t ok = pdPASS;
+    ok &= xTaskCreate(rx_task,    "rx",    4096, NULL, 6, NULL);
+    ok &= xTaskCreate(alert_task, "alert", 4096, NULL, 7, NULL);  // above rx
+    ok &= xTaskCreate(tx_task,    "tx",    4096, NULL, 5, NULL);
+    ok &= xTaskCreate(stats_task, "stats", 4096, NULL, 3, NULL);
+    if (ok != pdPASS) {
+        ESP_LOGE(TAG, "task creation failed -- out of heap?");
+        abort();
+    }
+}
+```
+
+## 17.7 Code walkthrough, line by line
+
+**.self = 1** · inside the transmit message
+
+The single line an earlier edition of this lab omitted, and the reason it could not work.
+
+`twai_message_t` holds a union of bitfields and a `flags` word, so `.self = 1` and the older `.flags = TWAI_MSG_FLAG_SELF` set the same bit. It asks the controller to place a copy of the transmitted frame into its own receive queue.
+
+**Why the mode alone is not enough:** `TWAI_MODE_NO_ACK` changes what counts as a *successful transmission*. Self-reception changes what gets *received*. Two different questions, two different settings. With the jumper fitted but no `.self`, the controller does see its own bits on RX — but a CAN controller normally suppresses reception of a frame it transmitted itself, so the queue stays empty.
+
+**#define FILTER_CODE(id) ((uint32_t)(id) << 21)**
+
+The bit arithmetic most people get wrong. For a **single filter with 11-bit standard IDs**, the hardware expects the ID in the **top 11 bits** of a 32-bit word, so you shift left by 21. Concretely, `0x123` becomes `0x24600000`.
+
+Get this wrong and the filter appears to work in Part A — because in loopback you only ever hear yourself — and then silently rejects everything on a real bus. Worth checking with a calculator once.
+
+**#define FILTER_MASK_EXACT 0x001FFFFF**
+
+**In the mask, a 1 bit means "don't care."** That is inverted from what most people assume, and it is the second half of the same trap.
+
+The low 21 bits are the unused padding below the ID, so they are always don't-care. Setting the top 11 bits to 0 means "every one of these must match." Result: exactly one ID accepted.
+
+To accept a *range*, set the bits that vary. `0x120` through `0x12F` differ only in the bottom four ID bits, so `code = 0x120 << 21` and `mask = (0x00F << 21) | 0x1FFFFF`.
+
+**twai_timing_config_t t = TWAI_TIMING_CONFIG_500KBITS()**
+
+The line v5.3 left unexplained. It expands to a prescaler plus segment counts that divide the 80 MHz APB clock into 20 time quanta of 100 ns, giving a 2.0 µs bit and a sample point at 80%. §17.4 has the derivation; proof case 5 measures it.
+
+The reason it matters: **this is the one setting every node on a bus must agree on.** The filter, the mode, and the queue depths are local decisions. Bit timing is a contract.
+
+**g.alerts_enabled = ...**
+
+The line that turns a demo into a node. Alerts are the driver's way of telling you about conditions you would otherwise never see: error-passive, bus errors, failed transmissions, a full receive queue, bus-off, and recovery.
+
+**You must opt in.** A driver installed with the default config raises none of these, which is why the earlier edition of this lab could not detect bus-off — it never asked to be told.
+
+**g.rx_queue_len = 10**
+
+How many received frames the driver buffers before dropping. The default is small. On a bus at 500 kbit/s a burst arrives far faster than a task can drain it, so this is your absorption buffer — the same reasoning as the DMA pool depth in Lab 20. `TWAI_ALERT_RX_QUEUE_FULL` tells you when it was not enough.
+
+**twai_get_status_info(&st)**
+
+The single most useful diagnostic call in the API. It reports the controller **state** and, critically, the two **error counters**.
+
+CAN nodes police themselves with those counters. Every transmit or receive error increments them and every success decrements them. Cross 127 and the node becomes **error passive** — still talking, but no longer allowed to assert dominant error flags. Cross 255 and it goes **bus-off** and removes itself entirely.
+
+That is the protocol deliberately ejecting a node it believes is faulty, so one broken device cannot take down a vehicle bus. Watching those counters climb is the clearest window into bus health you get.
+
+**the alert_task, and why recovery lives here**
+
+`twai_read_alerts()` blocks until something happens, so this task costs nothing while the bus is healthy.
+
+**`twai_initiate_recovery()` must be called from task context, never from an ISR.** After it is called, the CAN standard requires the controller to observe **128 occurrences of 11 consecutive recessive bits** before rejoining — a mandatory cooling-off period, not an ESP-IDF invention. At 500 kbit/s that is a few milliseconds, and during it the node is deaf.
+
+**ESP_ERROR_CHECK(twai_start()) after TWAI_ALERT_BUS_RECOVERED**
+
+The step people miss. **Recovery leaves the driver in the STOPPED state, not RUNNING.** If you do not restart it, the node completes recovery and then sits there silently forever, which looks exactly like a node that never recovered at all.
+
+**alert_task at priority 7, above rx_task at 6**
+
+Deliberate. When the bus is failing, handling the failure matters more than draining frames. If `rx_task` outranked the alert task, a flood of errors could keep you busy receiving while bus-off went unhandled.
+
+**esp_err_to_name(err)**
+
+Turns an `esp_err_t` into a readable string. Cheap, and it converts `rx error: 0x107` into `rx error: ESP_ERR_TIMEOUT`. Use it in every error log you write.
+
+**%03" PRIX32 " for the identifier**
+
+`twai_message_t.identifier` is `uint32_t`, whose underlying type varies across ESP-IDF targets and versions, so `%03lX` is not portable and produces a warning on some builds. `PRIX32` from `<inttypes.h>` expands to whatever is correct. Three hex digits is exactly right for an 11-bit ID (max `0x7FF`).
+
+## 17.8 Phase 2 — build, flash, run
+
+```text
+idf.py build
+idf.py -p COM6 flash monitor
+```
+
+> **[KEY POINT] Expected output, Part A with the GPIO5–GPIO4 jumper fitted**
+>
+> **Corrected in v5.4.** The v5.3 manual printed `filtering for 0x123`, which is not what the code in §17.6 logs. The startup line includes the computed code and mask, and seeing `0x24600000` there is your confirmation that the shift-by-21 arithmetic is right before you debug anything else.
+
+```text
+I lab17: TWAI up at 500 kbit/s, accepting only 0x123 (code 0x24600000, mask 0x001FFFFF)
+I lab17: [start] state=RUNNING tx_err=0 rx_err=0 tx_q=0 rx_q=0
+I lab17: RX id=0x123 dlc=4 data=[ DE AD BE 00 ]
+I lab17: RX id=0x123 dlc=4 data=[ DE AD BE 01 ]
+I lab17: RX id=0x123 dlc=4 data=[ DE AD BE 02 ]
+W lab17: tx_ok=10 tx_fail=0 rx_ok=10 bus_off=0 recovered=0
+I lab17: [periodic] state=RUNNING tx_err=0 rx_err=0 tx_q=0 rx_q=0
+```
+
+The counter byte incrementing proves these are fresh frames, not one frame echoing.
+
+> **[WARNING] If you see nothing received**
+>
+> **Jumper missing or on the wrong pins.** GPIO5 to GPIO4, both on the expansion base left column.
+>
+> **Filter wrong.** Check the startup line first — if `code` is not `0x24600000` the arithmetic is wrong, not the wiring. Then temporarily swap in `TWAI_FILTER_CONFIG_ACCEPT_ALL()`. If frames appear, it is the filter.
+>
+> **Wrong mode.** Without `TWAI_MODE_NO_ACK`, a lone node gets no acknowledgement, error counters climb, and it goes bus-off within a second or two. You would see that in the log now, which is the point of having the alert task.
+
+## 17.9 Phase 3 — prove it
+
+| # | Do this | Expected |
+|---|---|---|
+| 1 | Run as printed with the jumper. | `rx_ok` tracks `tx_ok`, state stays `RUNNING`, both error counters 0. |
+| 2 | **Prove the filter rejects.** Change `.identifier` in `tx_task` to `OTHER_ID` and reflash. | `tx_ok` still climbs, **`rx_ok` stays 0**, and you get "no frame in 2 s". The hardware dropped every frame without waking the CPU. Change it back. |
+| 3 | **Force bus-off.** Change the mode to `TWAI_MODE_NORMAL` with the jumper still fitted and no transceiver. | Error counters climb, `ERROR PASSIVE`, then **`BUS-OFF`**, then recovery and a restart. `bus_off` and `recovered` both increment. |
+| 4 | Leave case 3 running for two minutes. | It cycles: bus-off, recover, restart, bus-off again. **The node never gets permanently stuck** — that is the property you are demonstrating. |
+| 5 | **Measure the bit time.** New in v5.4 — see below. | 2.0 µs at 500 kbit/s, 8.0 µs at 125 kbit/s. |
+
+> **[KEY POINT] Case 3 is the one to record in your debug log**
+>
+> Nothing external is needed, and "I forced a node into bus-off and watched it recover" is a complete answer to a fault-handling question.
+
+### Proof case 5 — bit timing on the logic analyzer
+
+This closes the gap §17.4 opened, needs only hardware you already own, and produces a **[MEASURE]** number rather than a quoted one.
+
+1. Restore the code to Part A as printed (mode `NO_ACK`, ID `MY_ID`).
+2. Clip the FX2LP to **GPIO5** and ground. TX is push-pull 3.3 V logic, so no transceiver is needed to see the bit stream.
+3. In PulseView set the sample rate to **12 MHz**. At 500 kbit/s that is 24 samples per bit, which is enough to place edges cleanly. 4 MHz gives only 8 and the measurement gets noisy.
+4. Capture, then zoom into the SOF falling edge at the start of a frame.
+5. Measure the narrowest single-bit pulse you can find. **[MEASURE]** Record it.
+
+**[DERIVED]** It should be **2.0 µs**. Now:
+
+6. Change `app_main` to `TWAI_TIMING_CONFIG_125KBITS()`, rebuild, reflash, recapture.
+7. **[MEASURE]** Record the new narrowest pulse.
+
+**[DERIVED]** It should be **8.0 µs** — exactly 4× longer, because only the prescaler changed and the quanta count did not.
+
+> **[KEY POINT] Why this is the better debug-log entry**
+>
+> Case 3 shows you can handle a fault. Case 5 shows you predicted a number from a datasheet formula and then confirmed it on an instrument. That second thing is much rarer in a student, and it is the shape of answer that ends a "have you really used CAN?" question.
+>
+> While you are in PulseView, run the **sigrok CAN decoder** on the same capture. It will annotate SOF, the identifier, DLC, data bytes, CRC and ACK — the frame from §17.3.1, on your own bench, from your own board. Screenshot it.
+
+## 17.10 Extensions, worked
+
+### 17.10.1 — Arbitration, counted
+
+With two boards and two transceivers, the honest single-board-instrumented version is to count **arbitration-lost alerts**, which the controller reports directly.
+
+`g_arb_lost` is already declared in §17.6, so this is a two-line edit:
+
+```c
+    // add to the alerts enabled in app_main:
+    g.alerts_enabled |= TWAI_ALERT_ARB_LOST;
+
+    // and in alert_task:
+    if (alerts & TWAI_ALERT_ARB_LOST) {
+        g_arb_lost++;
+        // no logging here in a tight loop -- just count it
+    }
+```
+
+To see it in the periodic line, extend `stats_task`:
+
+```c
+        ESP_LOGW(TAG, "tx_ok=%" PRIu32 " tx_fail=%" PRIu32 " rx_ok=%" PRIu32
+                      " bus_off=%" PRIu32 " recovered=%" PRIu32
+                      " arb_lost=%" PRIu32,
+                 g_tx_ok, g_tx_fail, g_rx_ok, g_busoff, g_recovered,
+                 g_arb_lost);
+```
+
+**[MEASURE]** Run two boards transmitting continuously, one with ID `0x080` and one with `0x600`, both in `TWAI_MODE_NORMAL` on a properly terminated bus **at the same bit rate** (§17.4 — check this first). Record `g_arb_lost` on each after 60 s.
+
+**[DERIVED]** The expectation: the `0x600` node accumulates arbitration losses and the `0x080` node accumulates approximately none, because `0x080` is numerically lower and its dominant bits override. Neither node loses a *frame* — the loser retries — but only one of them is ever delayed.
+
+**If you do not have two transceivers**, do not fake it. Write the reasoning and the intended method in your debug log, mark it "not run — no second node," and move on. Proof cases 1 through 5 in §17.9 already carry this lab, and an honest "not measured" is worth more than an invented number.
+
+### 17.10.2 — Worst-case latency from the frame layout
+
+A paper exercise that uses §17.3.1 and §17.4 together, and it is a common interview follow-up.
+
+**[DERIVED]** A standard data frame with 8 bytes sums to 111 bits from the field table. Bit stuffing (§17.4.3) can add up to about 19 more in the worst case, so call it **130 bits**. At 500 kbit/s with a 2.0 µs bit:
+
+```text
+    worst-case frame time = 130 x 2.0 us = 260 us
+```
+
+So a high-priority message that arrives just after a low-priority frame has started waits at most one frame time — about **260 µs** — before it can begin arbitrating, and once it arbitrates it wins. That bounded number is the entire reason CAN is used for brakes.
+
+Contrast with the same question on Ethernet, where a collision means both frames are destroyed and both sides back off a *random* interval. There is no bound.
+
+## 17.11 Docs and references
+
+| Topic | Where |
+|---|---|
+| TWAI driver API, filters, alerts, recovery | ESP-IDF v5.5 → Peripherals → TWAI |
+| Bit timing config macros and segment values | `components/hal/include/hal/twai_types.h` |
+| Acceptance filter worked examples | ESP-IDF TWAI page, "Acceptance Filter" section |
+| Bus-off and recovery, runnable | `examples/peripherals/twai/twai_alert_and_recovery` |
+| Two-node communication | `examples/peripherals/twai/twai_network` |
+| Frame format, bit timing, fault confinement | Bosch CAN Specification 2.0 — the original document; the 127 and 255 thresholds are standard, not vendor-specific |
+| CAN decoder for your captures | sigrok/PulseView → Decoders → CAN |
+
+> **[NOTE] A note on ESP-IDF v6.0**
+>
+> v6.0 introduces an entirely new node-based TWAI API (`esp_twai_onchip.h`, with `twai_node_*` calls) alongside the legacy one. This lab targets **v5.5** and uses the classic `twai_*` API, which is correct for that version. If you later do the v6.0 migration exercise from Chapter 26, this is one of the drivers that changed most — which makes it a good one to port. Note that the filter mask convention **inverts** between the two APIs.
