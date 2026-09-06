@@ -10,7 +10,7 @@
 #define SAMPLE_HZ 20000
 #define FRAME_BYTES 1024 //256 samples -> 12.8ms
 #define POOL_BYTES (FRAME_BYTES*4) //4 frames -> 12.8*3 = 38.4 ms of slack
-#define STALL_MS 0  //set to 200 for proof case 2
+#define STALL_MS 200  //set to 200 for proof case 2
 
 static const char *TAG = "LAB20";
 
