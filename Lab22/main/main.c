@@ -12,6 +12,7 @@
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
 #include "esp_log.h"
+#include "cat_img.h"
 
 #define PIN_SCLK GPIO_NUM_12
 #define PIN_MOSI GPIO_NUM_11
@@ -35,13 +36,16 @@ static SemaphoreHandle_t buf_free;
 static volatile uint32_t g_done;
 
 
-static uint16_t band_colour(int band, int frame) {
+/** 
+ * 
+ static uint16_t band_colour(int band, int frame) {
     static const uint16_t pal[8] = {
         0xF800, 0xFD20, 0xFFE0, 0x07E0, 0X001F, 0X780F, 0x07FF, 0xFFFF,
     };
     return pal[(band+frame) % 8];
 }
 
+*/
 static bool IRAM_ATTR on_color_done(esp_lcd_panel_io_handle_t h, esp_lcd_panel_io_event_data_t *e, void *ctx) {
     (void) h;
     (void) e;
@@ -114,8 +118,9 @@ static void display_task(void *arg) {
             xSemaphoreTake(buf_free, portMAX_DELAY);
             uint16_t *b = buf[idx];
             int64_t f0 = esp_timer_get_time();
-            uint16_t col = band_colour(band,frame);
-            for(int i=0; i<STRIPE_PX; i++) b[i] = col;
+            //uint16_t col = band_colour(band,frame);
+            //for(int i=0; i<STRIPE_PX; i++) b[i] = col;
+            memcpy(b, &cat_img[y * H_RES], STRIPE_PX * sizeof(uint16_t));
             t_fill += esp_timer_get_time() - f0;
 
             esp_err_t err = esp_lcd_panel_draw_bitmap(panel, 0, y, H_RES, y+STRIPE, b);
