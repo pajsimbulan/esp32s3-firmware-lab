@@ -32,7 +32,7 @@
 #define MPU_ADDR 0x68
 #define MPU_WHO_AM_I 0x75
 
-#define FW_VERSION "v2-good"
+#define FW_VERSION "v2"
 
 static i2c_master_dev_handle_t s_mpu = NULL;
 
@@ -111,7 +111,7 @@ static void do_ota(const char *url) {
 }
 static void ota_task(void *arg)
 {
-    vTaskDelay(pdMS_TO_TICKS(15000));           // window to read the boot log
+    vTaskDelay(pdMS_TO_TICKS(3000));            // short window to read the boot log
     do_ota(FIRMWARE_URL);
     vTaskDelete(NULL);                          // only reached if OTA failed
 }
@@ -188,7 +188,8 @@ void app_main(void)
         }
     }
     //normal application
-     xTaskCreate(ota_task, "ota", 8192, NULL, 5, NULL);
+    //only the old build looks for an update, so v2 doesn't re-download itself every boot
+    if(strcmp(FW_VERSION, "v1") == 0) xTaskCreate(ota_task, "ota", 8192, NULL, 5, NULL);
     while(1) {
         vTaskDelay(pdMS_TO_TICKS(5000));
         ESP_LOGI(TAG, "alive(%s on  %s)", FW_VERSION, running->label);
