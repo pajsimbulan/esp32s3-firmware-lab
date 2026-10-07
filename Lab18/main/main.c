@@ -80,8 +80,8 @@ static void control_task( void *arg) {
 
     const char *mode_name = (MODE ==0) ? "P-only" : (MODE == 1) ? "PI, no anti-windup" : "PID, anti-windup";
 
-    ESP_LOGW(TAG, "mode=%s kp=%.2f out_max=%.0f", mode_name, ctl.kp, ctl.ki, (double)OUT_MAX);
-    printf("t,setpoint,pv,u\"n");
+    ESP_LOGW(TAG, "mode=%s kp=%.2f ki=%.2f out_max=%.0f", mode_name, (double)ctl.kp, (double)ctl.ki, (double)OUT_MAX);
+    printf("t,setpoint,pv,u\n");
     float peak = 0.0f;
     int n = (RUN_SECONDS *1000) / DT_MS;
     TickType_t next = xTaskGetTickCount();
