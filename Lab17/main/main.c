@@ -9,8 +9,26 @@
 
 #define TX_PIN GPIO_NUM_5
 #define RX_PIN GPIO_NUM_4
-#define MY_ID 0x123 //ID of this node
-#define OTHER_ID 0x456 // used for case 2
+#define TWO_NODE 1 //0 = single board self-test, 1 = two boards on a real bus
+#define NODE 1     //flash one board with 1, the other with 2 (TWO_NODE only)
+
+#if TWO_NODE && NODE == 2
+#define MY_ID 0x456 //ID this node sends
+#define OTHER_ID 0x123 //ID this node listens for
+#else
+#define MY_ID 0x123 //ID this node sends
+#define OTHER_ID 0x456 //ID this node listens for (TWO_NODE)
+#endif
+
+#if TWO_NODE
+#define BUS_MODE TWAI_MODE_NORMAL //real bus, the other node ACKs our frames
+#define SELF_RX 0
+#define RX_ID OTHER_ID //only accept the other node's frames
+#else
+#define BUS_MODE TWAI_MODE_NO_ACK //nobody to ACK, so don't wait for one
+#define SELF_RX 1 //hear our own frames back through the transceiver
+#define RX_ID MY_ID
+#endif
 
 #define FILTER_CODE(id) ((uint32_t)(id) << 21)
 #define FILTER_MASK_EXACT 0x001FFFFFu
@@ -45,7 +63,7 @@ static void tx_task(void *arg) {
         twai_message_t tx = {
             .identifier = MY_ID,
             .data_length_code = 5,
-            .self = 1, 
+            .self = SELF_RX,
             .data = {0xDE, 0xAD, 0xBE,0xEF ,counter},
         };
 
@@ -119,25 +137,25 @@ static void stats_task(void *arg) {
 
 void app_main(void)
 {
-    twai_general_config_t g = TWAI_GENERAL_CONFIG_DEFAULT(TX_PIN, RX_PIN, TWAI_MODE_NO_ACK);
+    twai_general_config_t g = TWAI_GENERAL_CONFIG_DEFAULT(TX_PIN, RX_PIN, BUS_MODE);
     g.alerts_enabled = TWAI_ALERT_ERR_PASS | TWAI_ALERT_BUS_ERROR | TWAI_ALERT_TX_FAILED | TWAI_ALERT_RX_QUEUE_FULL | TWAI_ALERT_BUS_OFF | TWAI_ALERT_BUS_RECOVERED;
     g.rx_queue_len = 10;
     g.tx_queue_len = 10;
 
     //500 kbits/s = 20Tq of 100ns , sample point at 80%
     //Proof case 5 swaps this for TWAI_TIMING_CONFIG_125KBITS()
-    twai_timing_config_t t = TWAI_TIMING_CONFIG_500KBITS();
+    twai_timing_config_t t = TWAI_TIMING_CONFIG_125KBITS();
 
     twai_filter_config_t f = {
-        .acceptance_code = FILTER_CODE(MY_ID),
+        .acceptance_code = FILTER_CODE(RX_ID),
         .acceptance_mask = FILTER_MASK_EXACT,
         .single_filter   = true,
     };
 
     ESP_ERROR_CHECK(twai_driver_install(&g, &t, &f));
     ESP_ERROR_CHECK(twai_start());
-    ESP_LOGI(TAG, "TWAI up at 500 kbits/s, accepting only 0x%03X " 
-    "(code 0x%08" PRIX32 ", mask 0x%08" PRIX32 ")",MY_ID, FILTER_CODE(MY_ID), (uint32_t)FILTER_MASK_EXACT);
+    ESP_LOGI(TAG, "TWAI up at 500 kbits/s, sending 0x%03X, accepting only 0x%03X " 
+    "(code 0x%08" PRIX32 ", mask 0x%08" PRIX32 ")",MY_ID, RX_ID, FILTER_CODE(RX_ID), (uint32_t)FILTER_MASK_EXACT);
     log_status("start");
 
     //Check every task creation. A silent failure here shows up Later as a
