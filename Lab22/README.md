@@ -2,7 +2,7 @@
 
 Driving a 240x320 TFT over SPI with DMA. One buffer is filled while the other is on the wire, so the CPU and the bus work at the same time. Then I measured the frame rate and checked it against the math.
 
-<a href="screenshots/lab22_demo_tft_image_over_spi_dma.mp4"><img src="screenshots/lab22_demo_tft_image_over_spi_dma_poster.jpg" width="220" alt="A photo drawn on the TFT over SPI DMA"></a>
+[![A photo drawn on the TFT over SPI DMA](screenshots/lab22_demo_tft_image_over_spi_dma_poster.jpg)](screenshots/lab22_demo_tft_image_over_spi_dma.mp4)
 
 *Click to play. An image converted to RGB565 on the laptop, stored in flash, and pushed to the display in stripes.*
 

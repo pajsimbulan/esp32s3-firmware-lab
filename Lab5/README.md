@@ -2,7 +2,7 @@
 
 Bringing up a real sensor from its datasheet. Reading the device ID, waking the part, and turning raw big-endian register pairs into signed acceleration in g. The bus is the ESP-IDF I2C master driver, and the sensor side is written against the register map, not a sensor library.
 
-<a href="screenshots/lab05_demo_mpu_tilt_with_i2c_capture.mp4"><img src="screenshots/lab05_demo_mpu_tilt_with_i2c_capture_poster.jpg" width="220" alt="Tilting the MPU while the log and the I2C capture update"></a>
+[![Tilting the MPU while the log and the I2C capture update](screenshots/lab05_demo_mpu_tilt_with_i2c_capture_poster.jpg)](screenshots/lab05_demo_mpu_tilt_with_i2c_capture.mp4)
 
 *Click to play. Tilting the IMU changes the ax, ay, az values in the log, with the logic analyzer tapped onto SDA and SCL.*
 

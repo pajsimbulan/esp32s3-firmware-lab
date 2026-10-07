@@ -2,7 +2,7 @@
 
 Asynchronous serial from the wire up. Framing and baud error, the driver's RX ring buffer, a physical loopback that proves the peripheral before trusting it, and a line parser that handles bytes arriving one at a time.
 
-<a href="screenshots/lab03_demo_uart_loopback_wire_pulled.mp4"><img src="screenshots/lab03_demo_uart_loopback_wire_pulled_poster.jpg" width="220" alt="UART loopback with the jumper pulled and put back"></a>
+[![UART loopback with the jumper pulled and put back](screenshots/lab03_demo_uart_loopback_wire_pulled_poster.jpg)](screenshots/lab03_demo_uart_loopback_wire_pulled.mp4)
 
 *Click to play. GPIO17 is jumpered to GPIO18. Pulling the wire stops the looped-back data, and putting it back brings it back.*
 

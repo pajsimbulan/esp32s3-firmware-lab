@@ -2,7 +2,7 @@
 
 Sampling a potentiometer at 20 kHz without the CPU touching a single sample. The ADC writes into a DMA pool in the background and the firmware only wakes up for full frames. Then I starve the reader on purpose to show what overflow looks like and that it gets reported, not hidden.
 
-<a href="screenshots/lab20_demo_pot_sweep_dma_adc.mp4"><img src="screenshots/lab20_demo_pot_sweep_dma_adc_poster.jpg" width="220" alt="Sweeping the pot while the DMA frame stats update"></a>
+[![Sweeping the pot while the DMA frame stats update](screenshots/lab20_demo_pot_sweep_dma_adc_poster.jpg)](screenshots/lab20_demo_pot_sweep_dma_adc.mp4)
 
 *Click to play. Turning the pot moves the per-frame mean from one rail to the other while frames keep arriving at a steady rate.*
 

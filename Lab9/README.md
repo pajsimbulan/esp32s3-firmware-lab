@@ -8,7 +8,7 @@ The other serial bus. Full duplex framing, clock polarity and phase, chip select
 
 | Bench | SPI modes |
 |---|---|
-| <img src="screenshots/lab09_bench_spi_loopback_with_analyzer.jpg" width="260" alt="SPI loopback wired to the logic analyzer"> | ![The four SPI modes](screenshots/lab09_concept_spi_modes.png) |
+| ![SPI loopback wired to the logic analyzer](screenshots/lab09_bench_spi_loopback_with_analyzer.jpg) | ![The four SPI modes](screenshots/lab09_concept_spi_modes.png) |
 
 | Shared bus, one CS per device | Full duplex |
 |---|---|

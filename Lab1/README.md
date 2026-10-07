@@ -2,7 +2,7 @@
 
 Digital input and output on the ESP32-S3. Reading an active-low button with a simple debounce, and driving an addressable WS2812 LED whose timing is generated in hardware by the RMT peripheral.
 
-<a href="screenshots/lab01_demo_boot_button_cycles_rgb_led.mp4"><img src="screenshots/lab01_demo_boot_button_cycles_rgb_led_poster.jpg" width="220" alt="Pressing BOOT cycles the RGB LED"></a>
+[![Pressing BOOT cycles the RGB LED](screenshots/lab01_demo_boot_button_cycles_rgb_led_poster.jpg)](screenshots/lab01_demo_boot_button_cycles_rgb_led.mp4)
 
 *Click to play. Each press of the BOOT button moves the onboard RGB LED to the next step: red, green, blue, off.*
 

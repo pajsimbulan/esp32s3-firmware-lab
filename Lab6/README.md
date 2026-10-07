@@ -2,7 +2,7 @@
 
 Hardware PWM. Why duty resolution and frequency trade against each other as plain arithmetic, why a duty change needs a latch, and stepping the duty from a task to make an LED breathe.
 
-<a href="screenshots/lab06_demo_led_pwm_fade.mp4"><img src="screenshots/lab06_demo_led_pwm_fade_poster.jpg" width="220" alt="LED fading in and out on hardware PWM"></a>
+[![LED fading in and out on hardware PWM](screenshots/lab06_demo_led_pwm_fade_poster.jpg)](screenshots/lab06_demo_led_pwm_fade.mp4)
 
 *Click to play. An LED on GPIO4 breathing up and down, driven by a task that steps the LEDC duty every 15 ms.*
 

@@ -2,7 +2,7 @@
 
 A Bluetooth Low Energy peripheral. The board advertises as `lab14-vib`, exposes a custom service with one characteristic carrying the live RMS value, and pushes it to a phone with notifications. Verified in nRF Connect.
 
-<a href="screenshots/lab14_demo_ble_notify_phone_and_log.mp4"><img src="screenshots/lab14_demo_ble_notify_phone_and_log_poster.jpg" width="220" alt="Phone and serial log side by side while notifications stream"></a>
+[![Phone and serial log side by side while notifications stream](screenshots/lab14_demo_ble_notify_phone_and_log_poster.jpg)](screenshots/lab14_demo_ble_notify_phone_and_log.mp4)
 
 *Click to play. Left: the board logs `connected`, `subscribe ... notify=1` and each notify. Right: nRF Connect finds `lab14-vib`, connects, and the value updates on its own.*
 

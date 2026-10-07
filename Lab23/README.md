@@ -2,7 +2,7 @@
 
 How boards get tested on a production line. At boot the firmware opens a short window and listens for a magic word. If the test station sends it, the board runs its self-tests, reports each one, and the station logs a PASS or FAIL with the board's serial number. If nobody asks, the board boots normally.
 
-<a href="screenshots/lab23_demo_factory_test_pass_fail_pass.mp4"><img src="screenshots/lab23_demo_factory_test_pass_fail_pass_poster.jpg" width="220" alt="Station run: PASS, FAIL with SDA pulled, PASS again"></a>
+[![Station run: PASS, FAIL with SDA pulled, PASS again](screenshots/lab23_demo_factory_test_pass_fail_pass_poster.jpg)](screenshots/lab23_demo_factory_test_pass_fail_pass.mp4)
 
 *Click to play. Same board three times: PASS, FAIL after pulling the IMU's SDA wire, then PASS after putting it back.*
 

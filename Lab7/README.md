@@ -2,7 +2,7 @@
 
 Labs 2 through 5 put together into one sensor node design. A periodic `esp_timer` callback paces sampling, a sampler task reads the IMU at a fixed rate into a window, a feature task computes RMS and peak per window, and the result goes out a UART. Acquire, process, report.
 
-<a href="screenshots/lab07_demo_vibration_rms_with_uart_log.mp4"><img src="screenshots/lab07_demo_vibration_rms_with_uart_log_poster.jpg" width="220" alt="Moving the IMU while RMS and the UART loopback update"></a>
+[![Moving the IMU while RMS and the UART loopback update](screenshots/lab07_demo_vibration_rms_with_uart_log_poster.jpg)](screenshots/lab07_demo_vibration_rms_with_uart_log.mp4)
 
 *Click to play. Shaking the IMU makes RMS and peak jump. Each result is also sent out UART1 and read back through a loopback wire.*
 
