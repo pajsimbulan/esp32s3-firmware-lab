@@ -24,7 +24,7 @@ static void producer_task(void *arg) {
     (void)arg ;
     uint32_t n = 0; 
     while(1) {
-        for(int i=0; i<= WIN; i++) g.win[i] = (float) (n+i);
+        for(int i=0; i< WIN; i++) g.win[i] = (float) (n+i);
         g.frames++;
         n++;
         vTaskDelay(pdMS_TO_TICKS(500));
