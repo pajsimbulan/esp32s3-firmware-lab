@@ -1,127 +1,71 @@
 # Lab 7: The Sensor Pipeline (Phase 1 Capstone)
 
-Assembling Labs 2 through 5 into a reusable sensor-node architecture: a hardware timer paces acquisition, a sampling task reads the IMU at a fixed rate, a window buffer accumulates samples, and a feature task computes RMS and peak on each completed window. Acquire, process, decide, communicate.
+Labs 2 through 5 put together into one sensor node design. A hardware timer paces sampling, a sampler task reads the IMU at a fixed rate into a window, a feature task computes RMS and peak per window, and the result goes out a UART. Acquire, process, report.
+
+[![Moving the IMU while RMS and the UART loopback update](screenshots/lab07_demo_vibration_rms_with_uart_log_poster.jpg)](screenshots/lab07_demo_vibration_rms_with_uart_log.mp4)
+
+*Click to play. Shaking the IMU makes RMS and peak jump. Each result is also sent out UART1 and read back through a loopback wire.*
+
+![Sensor pipeline: timer, sampler, feature task](screenshots/lab07_concept_sensor_pipeline.png)
 
 | | |
 |---|---|
-| **Target** | ESP32-S3 N16R8 |
-| **Peripherals** | `esp_timer`, I2C master, FreeRTOS semaphores |
-| **Pins** | GPIO8/9 I2C, GPIO4 as an instrumentation probe |
-| **Rates** | 1 kHz sampling, 256-sample window, ~3.9 Hz feature output |
-| **Key APIs** | `xSemaphoreCreateBinary()`, `xSemaphoreGiveFromISR()`, `xSemaphoreTake()`, `xTaskCreatePinnedToCore()` |
+| **Board** | ESP32-S3 N16R8 |
+| **Peripherals** | `esp_timer`, I2C master, UART1, FreeRTOS semaphores |
+| **Pins** | GPIO8/9 I2C to the MPU-6500, GPIO17 TX to GPIO18 RX loopback for the UART log |
+| **Rates** | 1 kHz sampling, 256 sample window, about 3.9 feature results per second |
+| **Key APIs** | `xSemaphoreCreateBinary()`, `xSemaphoreGive()` from the timer callback, `xSemaphoreTake()`, `xTaskCreatePinnedToCore()`, `uart_write_bytes()` |
 
----
-
-## Objective
-
-Build the architecture that every later lab plugs into. This is the first design where the answer to "why is it split this way" matters more than any individual API call, and it is the lab that turns into a whiteboard answer when someone asks how you structured your firmware.
-
----
-
-## Architecture
+## How it works
 
 ```
-esp_timer ISR (1 kHz)
-      |  gives tick_sem
-      v
-sampler task  ---- I2C burst read of 6 bytes, scale to g, write into window[]
-      |  gives win_ready every 256 samples
-      v
-feature task  ---- RMS and peak over the window, report
+esp_timer (1 kHz)
+   |  gives tick_sem
+   v
+sampler_task   I2C burst read, scale to g, store magnitude in win_buf[]
+   |  gives win_ready every 256 samples
+   v
+feature_task   RMS and peak over the window, log it, send it out UART1
 ```
 
-### Why three stages instead of one
+- **The timer only signals.** No I2C, no math, no logging in the callback. An I2C read takes hundreds of microseconds and blocks, so it belongs in a task.
+- **Fixed rate path vs variable cost path.** The sampler owns the bus and is paced by the timer. The feature task can take as long as it likes without moving the sample instants. That split is the main idea and it applies to almost every real-time data system.
+- **Semaphores used as signals, not locks.** The timer gives `tick_sem` and never takes it. The sampler takes it and never gives it. Same primitive as a lock, opposite meaning. Lab 16 shows when you want a real lock instead.
+- **Core pinning.** Both tasks are pinned to core 1 so Wi-Fi and BLE work on core 0 cannot preempt the real-time path.
+- **UART log stage.** Each result is written to UART1 and read back through a jumper, with a flush before each write so every read lines up with the message just sent.
 
-The timer ISR does one thing: signal. It performs no I2C, no math, no logging. An I2C transaction takes hundreds of microseconds and blocks; doing that in interrupt context would stall every other interrupt on the core and violate the rule that ISRs stay short.
+## Known limitation, left on purpose
 
-The sampler is the only owner of the bus. The feature task does the arithmetic, which can take variable time without ever perturbing the sample interval, because the sampler is paced by the timer rather than by the consumer.
+There is one window buffer shared by both tasks. Nothing stops the sampler from overwriting it while the feature task reads. At these rates the math finishes well inside one window, so it does not show, but it is a real race. Lab 22 fixes the same problem properly with two buffers and an ownership rule.
 
-That separation of a **fixed-rate acquisition path** from a **variable-cost processing path** is the whole point, and it generalizes to essentially every real-time data system.
+## Coming from the TM4C123
 
-### Semaphores are signals, not resources
+The ECE 425 version would be one ISR that reads the sensor, updates a global and sets a flag for the main loop. It works until any stage takes variable time, because there is nowhere to defer the work to. Here there is.
 
-The instinct from an OS course is to read a semaphore as guarding a resource, with take-and-release bracketing a critical section. Both semaphores here are used differently: as **one-way signals**. The ISR gives `tick_sem` and never takes it; the sampler takes it and never gives it. The count is a count of pending events, not a count of available resources. Same primitive, opposite mental model, and confusing the two produces code that deadlocks for reasons that look mysterious.
+## Results
 
-`xSemaphoreGiveFromISR()` exists as a separate function because the normal version can block, and blocking in interrupt context is not a thing that can happen. Its `pxHigherPriorityTaskWoken` output feeds `portYIELD_FROM_ISR()`, which makes the scheduler switch to the woken task immediately on ISR exit rather than at the next tick. That is the difference between microseconds and up to a full tick of latency.
-
-### Core pinning
-
-The sampler is pinned so that Wi-Fi and BLE work landing on the other core cannot preempt the real-time path. Being able to say why you pinned a task, rather than that you pinned it, is the part that gets asked about.
-
----
-
-## Known limitation, left in deliberately
-
-There is **one** window buffer, shared between the sampler and the feature task. Nothing prevents the sampler from beginning to overwrite the window while the feature task is still reading it. At current rates the feature computation finishes well inside one window period, so the race does not manifest, but it is a real race and not a theoretical one.
-
-It stays documented rather than patched because the fix is the double-buffering exercise, and Lab 22 implements exactly that pattern properly with an explicit ownership invariant. A race you have identified, bounded, and explained is a better artifact than one you silently avoided.
-
----
-
-## TM4C123 bridge
-
-The ECE 425 equivalent of this was a superloop with an ISR that did everything: read the sensor, update a global, set a flag, and let the main loop notice. It works, and it collapses as soon as any stage takes variable time, because there is nothing to defer to.
-
-The genuinely new concepts here are the ability to defer work from an ISR to a schedulable context, prioritization between stages, and the choice of which core to run on. The concept that carries over unchanged is that anything shared between an interrupt and normal code needs deliberate handling.
-
----
-
-## Verification
-
-| Acceptance criterion | How it was confirmed |
+| Check | Result |
 |---|---|
-| Sample rate is 1 kHz | GPIO4 toggled at the top and bottom of the sampler, captured on the analyzer |
-| Windows complete at the expected rate | Feature lines at ~3.9 Hz (1 kHz / 256) in the serial log |
-| Per-sample cost bounded | ~310 µs per sample, jitter under 20 µs, measured on the probe |
-| Values are physically sensible | RMS near 1.0 g at rest, peak rising sharply when the board is tapped |
-
----
+| Sample rate | 1 kHz, checked by toggling a pin around the sampler and capturing it |
+| Window rate | About 3.9 feature lines per second (1000 / 256) |
+| Cost per sample | About 310 µs, jitter under 20 µs |
+| Values | Small RMS at rest, big jump when the board is shaken |
+| UART log | Each result comes back intact through the loopback |
 
 ## What broke
 
-**Feature windows arrived at 1 Hz instead of 4 Hz.** This is the best debugging story in Phase 1.
-
-```
-SAW:    Expected ~4 feature lines/sec (1 kHz / 256). Got about 1.
-        RMS values looked plausible, so sampling worked. It was just slow.
-
-TRIED:  1. Checked the timer period: 1000 us, correct.
-        2. Logged a counter in the sampler: ~250 samples/sec, not 1000.
-           So the timer fires but the sampler misses ticks.
-        3. Toggled GPIO4 high at the top of sampler_task and low at the
-           bottom, captured at 1 MHz on the analyzer.
-
-FOUND:  The capture showed ~3.9 ms per iteration, not the ~0.3 ms I assumed.
-        The I2C timeout was being hit on most reads because SCL was
-        configured at 100 kHz, not 400 kHz. One config value.
-        After the fix: ~310 us per sample, jitter under 20 us, windows
-        at 3.9 Hz.
-
-LESSON: I assumed the sample rate instead of measuring it. The GPIO-toggle
-        trick took five minutes and would have found this immediately.
-```
-
-The generalizable technique is worth more than the fix: toggling a spare pin around a code section turns a software timing question into a waveform. It costs two GPIO writes and it is the cheapest profiler available on a microcontroller.
-
-**I had the I2C address model wrong in my notes.**
-I had written that `0x68` was a bit pattern applied to physical pins. It is a 7-bit address clocked out serially on SDA. Corrected, and it is the reason the addressing explanation in Lab 5 is as explicit as it is.
-
-**I described polling as blocking.**
-Backwards. Polling occupies the CPU checking a condition; blocking removes the task from the ready list so it consumes nothing. Getting this the wrong way round makes the entire justification for an RTOS incoherent, so it was worth being corrected on plainly.
-
----
+- **Windows arrived at 1 Hz instead of 4 Hz.** The best debug story in Phase 1.
+  - **Saw:** about 1 feature line a second instead of 4. Values looked fine, just slow.
+  - **Tried:** timer period was right. A counter in the sampler showed only about 250 samples a second, so ticks were being missed. Then I toggled GPIO4 high at the top of the sampler and low at the bottom and captured it.
+  - **Found:** each pass took about 3.9 ms, not 0.3 ms. SCL was set to 100 kHz instead of 400 kHz and reads were hitting the timeout. One config value.
+  - **Lesson:** I assumed the rate instead of measuring it. A pin toggle around a code block is the cheapest profiler on a microcontroller.
+- **UART log showed junk, then each line one message behind.** First a loose jumper (zero bytes). Then a stale byte left in the RX buffer made every fixed-length read start one byte late, so each line showed the previous window. `uart_flush_input()` before each write fixed it.
+- **Loopback jumper on the wrong pins.** "Below 9" meant two different things depending on whether you count IO labels or header positions. IO17 and IO18 are header pins 10 and 11.
 
 ## Build
 
 ```powershell
-idf.py set-target esp32s3
-idf.py build
-idf.py -p COM3 flash monitor
+idf.py build flash monitor
 ```
 
----
-
-## References
-
-- ESP-IDF Programming Guide v5.5, *FreeRTOS*, *I2C Master*, *High Resolution Timer*
-- FreeRTOS API reference: `xSemaphoreGiveFromISR`, `portYIELD_FROM_ISR`
+MPU on IO8/IO9 as in Lab 5, plus a jumper from IO17 to IO18.
