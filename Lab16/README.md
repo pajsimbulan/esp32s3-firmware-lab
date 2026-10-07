@@ -14,8 +14,8 @@ Causing the most-asked RTOS interview problem on purpose, timing it, and fixing 
 
 | | |
 |---|---|
-| **Board** | ESP32-S3 N16R8, all three tasks pinned to core 0 |
-| **Tasks** | LOW priority 3 (holds the lock 300 ms), MED priority 5 (runs 500 ms, needs no lock), HIGH priority 8 (wants the lock) |
+| **Board** | ESP32-S3 N16R8, all tasks (including the control task) pinned to core 0 |
+| **Tasks** | LOW priority 3 (holds the lock 300 ms), MED priority 5 (runs 500 ms, needs no lock), HIGH priority 8 (wants the lock), CTRL priority 9 (starts each trial and prints the summary) |
 | **Key APIs** | `xSemaphoreCreateBinary()` vs `xSemaphoreCreateMutex()`, task notifications to sequence the trial, `esp_timer_get_time()` |
 | **Switch** | `#define USE_MUTEX 0` for Part A, `1` for Part B |
 

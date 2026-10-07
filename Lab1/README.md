@@ -1,10 +1,10 @@
 # Lab 1: GPIO, the RGB LED and the BOOT Button
 
-Digital input and output on the ESP32-S3. Reading an active-low button with debounce, and driving an addressable WS2812 LED whose timing is generated in hardware by the RMT peripheral.
+Digital input and output on the ESP32-S3. Reading an active-low button with a simple debounce, and driving an addressable WS2812 LED whose timing is generated in hardware by the RMT peripheral.
 
 <a href="screenshots/lab01_demo_boot_button_cycles_rgb_led.mp4"><img src="screenshots/lab01_demo_boot_button_cycles_rgb_led_poster.jpg" width="220" alt="Pressing BOOT cycles the RGB LED"></a>
 
-*Click to play. Each press of the BOOT button moves the onboard RGB LED to the next color.*
+*Click to play. Each press of the BOOT button moves the onboard RGB LED to the next step: red, green, blue, off.*
 
 ![Why a pressed button reads 0](screenshots/lab01_concept_button_pullup.png)
 
@@ -14,14 +14,14 @@ Digital input and output on the ESP32-S3. Reading an active-low button with debo
 | **Peripherals** | GPIO, RMT |
 | **Pins** | GPIO48 onboard WS2812 RGB LED, GPIO0 BOOT button |
 | **Parts** | None, both are on the board |
-| **Key APIs** | `gpio_config()`, `gpio_get_level()`, `led_strip_new_rmt_device()`, `led_strip_set_pixel()`, `led_strip_refresh()` |
+| **Key APIs** | `gpio_config()`, `gpio_get_level()`, `led_strip_new_rmt_device()`, `led_strip_set_pixel()`, `led_strip_clear()`, `led_strip_refresh()` |
 
 ## How it works
 
 - **The button is active low.** An internal pull-up holds GPIO0 at 3.3 V and pressing the button shorts it to ground, so a press reads 0. GPIO0 is also a strapping pin that picks the boot mode at reset, so it is safe to read after boot but not to drive.
-- **Debounce by polling.** Contacts bounce for a few milliseconds. The loop only accepts a new level once it is stable across samples a few ms apart. Lab 8 replaces this with a real interrupt and a queue.
+- **Debounce by waiting for release.** Contacts bounce for a few milliseconds. The loop polls every 20 ms, counts a press when it sees a 0, then waits in 10 ms steps until the button reads 1 again before it looks for the next press. Lab 8 replaces this with a real interrupt and a queue.
 - **`1ULL << pin`, not `1 << pin`.** GPIO48 is past bit 31, so a 32-bit shift is undefined and quietly configures the wrong pin.
-- **The LED is a serial device, not three LEDs.** The WS2812 encodes each bit as a pulse width, with 1 and 0 a few hundred nanoseconds apart. A FreeRTOS task cannot toggle a pin that precisely, so the RMT peripheral clocks the waveform out in hardware.
+- **The LED is a serial device, not three LEDs.** The WS2812 encodes each bit as a pulse width, with 1 and 0 a few hundred nanoseconds apart. A FreeRTOS task cannot toggle a pin that precisely, so the RMT peripheral (10 MHz tick, through the `led_strip` component) clocks the waveform out in hardware.
 - **Set, then refresh.** `led_strip_set_pixel()` only writes RAM. `led_strip_refresh()` sends it. Describe the state, then commit it. The same pattern comes back with the display in Lab 22.
 
 ## Results
@@ -29,10 +29,10 @@ Digital input and output on the ESP32-S3. Reading an active-low button with debo
 | Check | Result |
 |---|---|
 | LED output | Lights on the first refresh |
-| Button input | Logs 1 at idle and 0 while held |
+| Button input | Reads 1 at idle and 0 while held |
 | Debounce | One event per physical press, not three to five |
 | RMT timing | Color matches the RGB value written, no flicker |
-| Extension | Each press steps red, green, blue, which forced a clean split between the color the firmware thinks it set and what the LED is showing |
+| Extension | Each press steps red, green, blue, off, which forced a clean split between the color the firmware thinks it set and what the LED is showing |
 
 ## What broke
 

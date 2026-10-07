@@ -20,7 +20,7 @@ An edge interrupt on a real button, an ISR that only posts an event, and a worke
 
 ## How it works
 
-- **Two halves.** The ISR reads which pin fired, pushes it into a queue, asks for a context switch and returns. Debounce, logging and the response happen in a normal task. Linux calls this top half and bottom half.
+- **Two halves.** The ISR takes the pin number from its argument, pushes it into a queue, asks for a context switch and returns. Debounce, logging and the response happen in a normal task. Linux calls this top half and bottom half.
 - **`FromISR` versions.** `xQueueSend` can block, and you cannot block in an interrupt. `xQueueSendFromISR` never blocks and reports whether it woke a higher priority task. `portYIELD_FROM_ISR()` then switches straight to that task instead of waiting up to a full tick.
 - **`IRAM_ATTR`.** Code normally runs from flash through a cache. A miss in an ISR stalls, and if the flash is busy being written it cannot be fetched at all. `IRAM_ATTR` puts the handler in internal RAM. The debugger proves it: `btn_isr` sits at `0x40376884` in IRAM while `app_main` is up at `0x42...` in flash.
 - **The catch.** `IRAM_ATTR` covers the function, not what it touches. String literals and called functions can still live in flash, which is why `ESP_LOGI` in an ISR is the classic mistake.
@@ -46,7 +46,7 @@ Pressing Enter on an empty `(gdb)` line repeats the last command, which once sen
 
 ## What broke
 
-- **The interrupt was armed before its handler existed.** `gpio_config()` with an interrupt type arms it right away, and I registered the handler after. A finger cannot press that fast, which is what makes it dangerous. Configure, register, then enable.
+- **The interrupt was armed before its handler existed.** `gpio_config()` with an interrupt type arms it right away, and I registered the handler after. A finger cannot press that fast, which is what makes it dangerous. The safe order is configure with interrupts off, register, then enable. The lab code still has the original order.
 - **Held presses repeat.** The fixed debounce delay assumes the button is released. Fine for the lab, documented rather than hidden.
 - **Events exactly 20 ms apart.** Suspiciously equal to my own debounce delay, not a property of the button. Following that to a measurement instead of a guess is the habit this whole series is about.
 - **Zadig showed an empty list.** It hides devices that already have a driver. Options, List All Devices.

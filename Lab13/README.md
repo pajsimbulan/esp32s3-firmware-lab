@@ -13,15 +13,15 @@ Getting data off the device. Event-driven Wi-Fi bring-up, then an HTTP client po
 | **Board** | ESP32-S3 N16R8 |
 | **Subsystems** | Wi-Fi station, LwIP, `esp_http_client`, `protocol_examples_common` |
 | **Key APIs** | `nvs_flash_init()`, `esp_netif_init()`, `esp_event_loop_create_default()`, `example_connect()`, `esp_http_client_perform()` |
-| **Host** | Python receiver on port 8000 that accepts POST |
+| **Host** | `telemetry_receiver.py`, a Python receiver on port 8000 that accepts POST |
 
 ## How it works
 
 - **Four init calls, in order.** NVS (Wi-Fi keeps calibration there, which is why Lab 10 came first), the TCP/IP stack, the default event loop, then connect. Skip the first and Wi-Fi will not start.
-- **Wi-Fi is event-driven.** There is no "connect and wait" call underneath. You register for events and get called back.
-- **Associated is not the same as having an IP.** `WIFI_EVENT_STA_CONNECTED` means the radio joined the access point. DHCP is not done yet and any socket opened then fails. The event to wait for is `IP_EVENT_STA_GOT_IP`.
-- **Disconnects happen.** `WIFI_EVENT_STA_DISCONNECTED` fires whenever the link drops, and the device has to reconnect on its own. That is the difference between a demo and a product.
-- **The POST.** Build the JSON body, set `Content-Type: application/json`, perform, read the status code, and always clean up the client so nothing leaks per transmission.
+- **Wi-Fi is event-driven.** There is no "connect and wait" call underneath. `example_connect()` from `protocol_examples_common` registers the event handlers for me and blocks until the station has an IP, so `main.c` never touches the events directly.
+- **Associated is not the same as having an IP.** `WIFI_EVENT_STA_CONNECTED` means the radio joined the access point. DHCP is not done yet and any socket opened then fails. The event to wait for is `IP_EVENT_STA_GOT_IP`, which is what `example_connect()` waits on.
+- **Disconnects happen.** `WIFI_EVENT_STA_DISCONNECTED` fires whenever the link drops, and the device has to reconnect on its own. The example component's handler retries the connection on that event. That is the difference between a demo and a product.
+- **The POST.** Build the JSON body with `snprintf`, post it to `http://<laptop-ip>:8000/telemetry`, set `Content-Type: application/json`, perform, read the status code, and always clean up the client so nothing leaks per transmission.
 
 ## Results
 
@@ -45,4 +45,4 @@ idf.py menuconfig   # Example Connection Configuration: SSID and password
 idf.py build flash monitor
 ```
 
-Start the receiver on the laptop first. Same network for both, and set the laptop's IP in `main.c`.
+Start the receiver on the laptop first with `python telemetry_receiver.py` (port 8000 by default). Same network for both, and set the laptop's IP in `main.c`.

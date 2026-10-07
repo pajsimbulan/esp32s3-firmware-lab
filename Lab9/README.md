@@ -4,7 +4,7 @@ The other serial bus. Full duplex framing, clock polarity and phase, chip select
 
 ![SPI loopback decoded as DE AD BE EF on both MOSI and MISO](screenshots/lab09_proof_spi_loopback_decoded_deadbeef.png)
 
-*PulseView decodes `DE AD BE EF` on MOSI and the same bytes coming back on MISO in the same clock burst. The log below reads `rx: DE AD BE EF` every 500 ms.*
+*PulseView decodes `DE AD BE EF` on MOSI and the same bytes coming back on MISO in the same clock burst. The serial monitor prints `rx: DE AD BE EF` every 500 ms.*
 
 | Bench | SPI modes |
 |---|---|

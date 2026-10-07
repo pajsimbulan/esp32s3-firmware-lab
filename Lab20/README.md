@@ -17,20 +17,20 @@ Sampling a potentiometer at 20 kHz without the CPU touching a single sample. The
 | **Rate** | 20 kHz, 12-bit |
 | **Frames** | 1024 bytes = 256 samples = 12.8 ms, about 78 frames/s |
 | **Pool** | 4 frames, about 38 ms of slack |
-| **Key APIs** | `adc_continuous_new_handle()`, `adc_continuous_config()`, `adc_continuous_register_event_callbacks()`, `adc_continuous_read()` |
+| **Key APIs** | `adc_continuous_new_handle()`, `adc_continuous_config()`, `adc_continuous_register_event_callbacks()`, `adc_continuous_start()`, `adc_continuous_read()` |
 
 ## How it works
 
 - **The CPU sets it up and walks away.** The ADC and DMA fill the pool on their own. A conversion-done callback fires per frame and the reader task drains it.
 - **Slack is a budget.** The pool holds 4 frames. If the reader is late by more than about 38 ms, new samples have nowhere to go.
-- **Overflow is reported.** The pool-overflow event is counted and logged as `pool overflow -- samples lost`. Setting `STALL_MS 200` makes the reader sleep longer than the slack and proves the warning fires.
+- **Overflow is reported.** The pool-overflow callback is counted, and when a read fails because the pool overflowed the firmware logs `pool overflow -- samples lost`. Setting `STALL_MS 200` makes the reader sleep longer than the slack and proves the warning fires. The code currently ships with `STALL_MS 200`, so set it to 0 for the normal case.
 - **Rate is measured, not assumed.** The log prints frames per second and the mean value, so a wrong clock divider shows up right away.
 
 ## Results
 
 | Case | Result |
 |---|---|
-| Normal reader | About 78 frames/s, no overflow, mean follows the pot |
+| Normal reader (`STALL_MS 0`) | About 78 frames/s, no overflow, mean follows the pot |
 | `STALL_MS 200` | Overflow warnings every stall, samples lost and counted |
 
 ## Build

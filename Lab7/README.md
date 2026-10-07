@@ -1,6 +1,6 @@
 # Lab 7: The Sensor Pipeline (Phase 1 Capstone)
 
-Labs 2 through 5 put together into one sensor node design. A hardware timer paces sampling, a sampler task reads the IMU at a fixed rate into a window, a feature task computes RMS and peak per window, and the result goes out a UART. Acquire, process, report.
+Labs 2 through 5 put together into one sensor node design. A periodic `esp_timer` callback paces sampling, a sampler task reads the IMU at a fixed rate into a window, a feature task computes RMS and peak per window, and the result goes out a UART. Acquire, process, report.
 
 <a href="screenshots/lab07_demo_vibration_rms_with_uart_log.mp4"><img src="screenshots/lab07_demo_vibration_rms_with_uart_log_poster.jpg" width="220" alt="Moving the IMU while RMS and the UART loopback update"></a>
 
@@ -31,7 +31,7 @@ feature_task   RMS and peak over the window, log it, send it out UART1
 - **The timer only signals.** No I2C, no math, no logging in the callback. An I2C read takes hundreds of microseconds and blocks, so it belongs in a task.
 - **Fixed rate path vs variable cost path.** The sampler owns the bus and is paced by the timer. The feature task can take as long as it likes without moving the sample instants. That split is the main idea and it applies to almost every real-time data system.
 - **Semaphores used as signals, not locks.** The timer gives `tick_sem` and never takes it. The sampler takes it and never gives it. Same primitive as a lock, opposite meaning. Lab 16 shows when you want a real lock instead.
-- **Core pinning.** Both tasks are pinned to core 1 so Wi-Fi and BLE work on core 0 cannot preempt the real-time path.
+- **Core pinning.** Both tasks are pinned to core 1, with the sampler at priority 6 above the feature task at 5. That keeps core 0 free for Wi-Fi later so radio work does not compete with the real-time path.
 - **UART log stage.** Each result is written to UART1 and read back through a jumper, with a flush before each write so every read lines up with the message just sent.
 
 ## Known limitation, left on purpose

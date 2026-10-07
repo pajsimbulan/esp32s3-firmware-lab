@@ -18,7 +18,7 @@ A bug that only shows up as a wrong number: a loop bound that changes on its own
 |---|---|
 | **Board** | ESP32-S3 N16R8, built-in USB-JTAG, no external probe |
 | **Tools** | OpenOCD, `xtensa-esp32s3-elf-gdb`, VS Code terminal |
-| **Bug** | Producer writes `win[0..WIN]`, one past the end, into `win_len` |
+| **Bug** | Producer loop used `i <= WIN`, writing `win[8]`, one past the end, into `win_len`. The code in this repo has the fix (`i < WIN`) |
 | **Key commands** | `watch g.win_len`, `p &g.win[8]`, `p &g.win_len`, `info threads`, `thread 2`, `bt` |
 
 ## How it works
@@ -42,7 +42,7 @@ A bug that only shows up as a wrong number: a loop bound that changes on its own
 ```powershell
 idf.py build flash
 openocd -f board/esp32s3-builtin.cfg
-xtensa-esp32s3-elf-gdb build/lab21.elf -ex "target extended-remote :3333"
+xtensa-esp32s3-elf-gdb build/Lab21.elf -ex "target extended-remote :3333"
 ```
 
 In GDB: `mon reset halt`, `break app_main`, `continue`, `watch g.win_len`, `continue`.

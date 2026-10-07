@@ -20,7 +20,7 @@ Putting the chip into deep sleep, waking it on a timer, and keeping a counter al
 
 - **Deep sleep is a reboot with a little memory.** The CPUs, most SRAM and the peripherals power down. Only the RTC domain stays on. On wake the chip runs the bootloader again and enters `app_main()` from the top.
 - **`RTC_DATA_ATTR`.** Normal globals are gone after sleep. A variable marked `RTC_DATA_ATTR` lives in RTC memory that stays powered, which is how `wake_count` keeps climbing.
-- **Cold boot or wake.** `esp_sleep_get_wakeup_cause()` tells them apart. That one branch at the top of `app_main()` is the whole shape of a duty-cycled device: full init on cold boot, minimum work on wake, then back to sleep.
+- **Cold boot or wake.** `esp_sleep_get_wakeup_cause()` tells them apart. Here that branch only picks which line to log. In a real duty-cycled device it is where you split full init on cold boot from minimum work on wake, then go back to sleep.
 - **Wake sources.** A timer here. A GPIO wake needs an RTC-capable pin, because the normal GPIO matrix is powered down.
 - **Battery life is a duty cycle.** Short active spikes over a long low floor. Average current from the ratio, then divide the battery capacity by it.
 
@@ -29,7 +29,7 @@ Putting the chip into deep sleep, waking it on a timer, and keeping a counter al
 | Check | Result |
 |---|---|
 | Enters deep sleep | Log stops and the chip goes quiet |
-| Timer wake | Reboots every 5 s on schedule |
+| Timer wake | Wakes after each 5 s sleep (about 5.5 s per cycle with the 500 ms of awake time) |
 | State survives | `wake #5`, `wake #6`, ... instead of starting over |
 | Cause is known | Cold boot and timer wake take different branches |
 

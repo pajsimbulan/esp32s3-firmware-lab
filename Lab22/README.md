@@ -20,16 +20,16 @@ Driving a 240x320 TFT over SPI with DMA. One buffer is filled while the other is
 | **Display** | ST7789V 2.0" 240x320, RGB565 |
 | **Pins** | SCLK IO12, MOSI IO11, CS IO10, DC IO14, RST IO15, BL to 3V3 |
 | **SPI clock** | 10 MHz |
-| **Key APIs** | `spi_bus_initialize()` with `SPI_DMA_CH_AUTO`, `spi_device_queue_trans()`, `spi_device_get_trans_result()`, `heap_caps_malloc(MALLOC_CAP_DMA)` |
-| **Host tool** | `convert.py` turns any image into a 240x320 RGB565 C array |
+| **Key APIs** | `spi_bus_initialize()` with `SPI_DMA_CH_AUTO`, `esp_lcd_new_panel_io_spi()`, `esp_lcd_new_panel_st7789()`, `esp_lcd_panel_draw_bitmap()`, `on_color_trans_done` callback, `heap_caps_malloc(MALLOC_CAP_DMA)` |
+| **Host tool** | `convert.py` turns `cat.jpg` into a 240x320 RGB565 C array (`cat_img.h`) |
 
 ## How it works
 
 - **The wire limit first.** 240 x 320 x 2 bytes = 153,600 bytes = 1.23 Mbit per frame. At 10 MHz that is 8.1 fps at most. The board measured 8.0, so the firmware is not the bottleneck.
-- **Stripes, not a full frame.** A whole frame is 150 KB. The display is drawn in stripes from two small DMA-capable buffers in internal RAM.
-- **Ping-pong.** While DMA sends stripe A, the CPU fills stripe B. Then they swap. The fill time hides under the transfer time.
-- **D/C is a GPIO.** The ST7789 uses one pin to tell commands from pixel data. A pre-transfer callback sets it per transaction.
-- **Byte order.** RGB565 goes out high byte first. Getting it backwards gives wrong but stable colors, which is a useful clue.
+- **Stripes, not a full frame.** A whole frame is 150 KB. The display is drawn in 40-row stripes (19,200 bytes each) from two DMA-capable buffers in internal RAM.
+- **Ping-pong.** While DMA sends stripe A, the CPU copies the next stripe of the image into buffer B. Then they swap. A counting semaphore tracks free buffers, and the `on_color_trans_done` callback gives one back when a transfer finishes. The fill time hides under the transfer time.
+- **D/C is a GPIO.** The ST7789 uses one pin to tell commands from pixel data. The `esp_lcd` panel IO driver drives it (`dc_gpio_num`) for each command and data transfer.
+- **Byte order.** RGB565 goes out high byte first, so `convert.py` byte-swaps each pixel before writing the array. Getting it backwards gives wrong but stable colors, which is a useful clue.
 
 ## Results
 
@@ -46,6 +46,6 @@ Driving a 240x320 TFT over SPI with DMA. One buffer is filled while the other is
 ## Build
 
 ```powershell
-python convert.py cat.jpg     # writes cat_img.h, move it into main/
+python convert.py     # reads cat.jpg, writes cat_img.h, move it into main/
 idf.py build flash monitor
 ```

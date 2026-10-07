@@ -14,7 +14,7 @@ A discrete PID controller running at a fixed 10 ms rate on the ESP32-S3 against 
 |---|---|
 | **Board** | ESP32-S3 N16R8 |
 | **Loop** | 10 ms fixed interval (`DT_MS 10`), 40 s per run |
-| **Plant** | Simulated first-order system, time constant 3 s, output clamped to 0..115 |
+| **Plant** | Simulated first-order system, time constant 3 s. Controller output clamped to 0..115 |
 | **Gains** | Kp 1.5, Ki 0 or 1.5, Kd 0 |
 | **Switch** | `#define MODE 0` P only, `1` PI no anti-windup, `2` PI with anti-windup |
 | **Output** | CSV `t,setpoint,pv,u` over serial, plus a summary box |

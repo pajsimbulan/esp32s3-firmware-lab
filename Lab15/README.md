@@ -15,7 +15,7 @@ Updating firmware over Wi-Fi, and more importantly surviving a bad update. Two a
 | | |
 |---|---|
 | **Board** | ESP32-S3 N16R8, 16 MB flash |
-| **Partitions** | `ota_0` and `ota_1` at 1.75 MB each, plus `otadata` and `nvs` |
+| **Partitions** | `ota_0` and `ota_1` at 1.75 MB each, plus `otadata`, `nvs` and `phy_init` |
 | **Subsystems** | `esp_https_ota`, `app_update`, bootloader rollback, NVS |
 | **Key APIs** | `esp_https_ota()`, `esp_ota_get_running_partition()`, `esp_ota_get_state_partition()`, `esp_ota_mark_app_valid_cancel_rollback()`, `esp_ota_mark_app_invalid_rollback_and_reboot()` |
 | **Config** | `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`, `CONFIG_ESP_HTTPS_OTA_ALLOW_HTTP`, 16 MB flash |
@@ -25,7 +25,7 @@ Updating firmware over Wi-Fi, and more importantly surviving a bad update. Two a
 
 - **Two slots and a pointer.** An update is written into the slot that is not running, so a failed download leaves the working image untouched. The last step flips the pointer in `otadata`.
 - **Probation.** A new image boots as `PENDING_VERIFY`. It has to prove itself and call mark-valid. If it fails, or crashes before it can decide, the bootloader goes back to the old slot. The safe outcome is the default.
-- **The self-test is the engineering.** Downloading is a library call. Deciding what "working" means is the design. Mine checks three things: the NVS namespace exists, the IMU answers on I2C, and the update server is reachable (a `GET /health` that must return 2xx, with retries).
+- **The self-test is the engineering.** Downloading is a library call. Deciding what "working" means is the design. Mine checks that the NVS namespace exists, the IMU answers on I2C with a known `WHO_AM_I` value, the station is associated with the access point, and the update server is reachable (a `GET /health` that must return 2xx, up to 3 tries).
 - **Version and slot in every log line.** `boot: v2 running from ota_1` makes it impossible to confuse which image is running.
 
 ## Rollback, caught for real
@@ -68,7 +68,7 @@ idf.py menuconfig          # Wi-Fi credentials
 idf.py build flash         # flash v1 over USB
 # set FW_VERSION to "v2", then:
 idf.py build               # do not flash
-cd build; python -m http.server 8070
+cd build; python -m http.server 8070   # serves lab15_ota.bin, add an empty file named health
 ```
 
 Then reset the board and watch it update itself.

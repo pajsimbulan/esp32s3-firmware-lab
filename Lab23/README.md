@@ -15,16 +15,16 @@ How boards get tested on a production line. At boot the firmware opens a short w
 | | |
 |---|---|
 | **Board** | ESP32-S3 N16R8 with the MPU-6500 from earlier labs |
-| **Handshake** | Board prints `FACTORY_READY`, station sends `TESTMODE` within 3000 ms |
+| **Handshake** | Board prints `FACTORY_READY`, station waits for it and sends `TESTMODE`, board listens for 3000 ms |
 | **Tests** | `FLASH`, `PSRAM`, `IMU_PRESENT`, `IMU_SANE`, `PROVISION` |
-| **Identity** | Serial number from the factory MAC, `58E6C56E7600` on this board |
-| **Station** | `station.py` (pyserial), appends to `factory_log.csv`, exit code 0 or 1 |
+| **Identity** | Serial number from the factory Wi-Fi station MAC, saved to NVS by `PROVISION`, `58E6C56E7600` on this board |
+| **Station** | `station.py` (pyserial), appends to `factory_log.csv`, exit code 0 (pass), 1 (board failed) or 2 (fixture problem) |
 
 ## How it works
 
 - **A test window, not a test build.** The same firmware ships and tests. Production never has to flash a special image.
-- **Each check prints one line.** `TEST IMU_PRESENT PASS`, then a final `RESULT PASS`. Easy for a script to parse and easy for a person to read.
-- **The station decides.** It records timestamp, serial, verdict and the names of failing tests. A run that never reaches `RESULT` is logged as `INCOMPLETE` and treated as a failure.
+- **Each check prints one line.** `TEST IMU_PRESENT PASS`, then a final `RESULT PASS`. `PROVISION` only runs if the hardware checks passed. Easy for a script to parse and easy for a person to read.
+- **The station decides.** It records timestamp, serial, verdict and the names of failing tests. A `RESULT PASS` without every required test reported is logged as `INCOMPLETE` and treated as a failed board. A run that never reaches `FACTORY_READY` or `RESULT` is logged as `NO_READY` or `TIMEOUT` and exits with 2, because that usually means a cable, port or power problem, not a bad board.
 - **Sane, not just present.** `IMU_SANE` checks that the accelerometer reads about 1 g at rest. A sensor that answers but reads nonsense still fails.
 - **Avoiding the race.** The UART driver is installed before `FACTORY_READY` is printed, so a fast station's `TESTMODE` lands in the buffer instead of being lost.
 

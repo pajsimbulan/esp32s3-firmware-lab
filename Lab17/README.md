@@ -24,7 +24,7 @@ The bus inside cars and industrial machines. Two ESP32-S3 boards, each with its 
 | **Transceivers** | 2x Adafruit CAN Pal (NXP TJA1051T/3), onboard 120 Ω termination on both |
 | **Pins** | GPIO5 TX and GPIO4 RX on each board, SLNT tied to GND |
 | **IDs** | Node 1 sends `0x123` and accepts only `0x456`. Node 2 is the mirror |
-| **Bit rate** | 125 kbit/s (clean). 500 kbit/s fails on my wiring, see below |
+| **Bit rate** | 125 kbit/s (clean) via `TWAI_TIMING_CONFIG_125KBITS()`. Swapping in `TWAI_TIMING_CONFIG_500KBITS()` fails on my wiring, see below |
 | **Key APIs** | `twai_driver_install()`, `twai_start()`, `twai_transmit()`, `twai_receive()`, `twai_read_alerts()`, `twai_initiate_recovery()` |
 | **Tools** | Logic analyzer on both nodes' TX and RX at 4 MHz, PulseView CAN decoder |
 
@@ -34,7 +34,7 @@ The bus inside cars and industrial machines. Two ESP32-S3 boards, each with its 
 - **Arbitration.** A 0 is dominant and wins over a 1. Every sender reads the bus while sending its ID, and whoever sends a 1 but reads a 0 backs off right away. The winner's frame is untouched. Lower ID means higher priority.
 - **The ACK bit.** Every frame needs at least one other node to drive the ACK slot. That one dip in the capture is the proof that two real nodes are talking.
 - **Hardware filter.** The acceptance filter drops other IDs before any interrupt fires. The mask is inverted from what you would expect (1 means don't care), so `0x123` sits in the top 11 bits as `0x24600000` with mask `0x001FFFFF`.
-- **Error states.** At 128 a node goes error passive. Above 255 it goes bus-off and removes itself, so one broken node cannot jam the bus. `twai_initiate_recovery()` brings it back.
+- **Error states.** At 128 a node goes error passive. Above 255 it goes bus-off and removes itself, so one broken node cannot jam the bus. `twai_initiate_recovery()` brings it back, and once the `TWAI_ALERT_BUS_RECOVERED` alert arrives the code calls `twai_start()` again.
 - **The transceiver is just the voice.** The CAN protocol lives in the ESP32's TWAI controller. The CAN Pal only turns TX and RX logic levels into the CANH/CANL differential pair. CANH and CANL never touch an ESP32 pin.
 - **One file, two nodes.** `#define NODE 1` or `2` picks the IDs. `#define TWO_NODE 0` brings back the single board self-test.
 - **Stuff bits.** The blue bits in the decoder row are stuff bits. After five equal bits CAN inserts an opposite one so receivers stay in sync.
@@ -61,7 +61,7 @@ My first try used one ESP32 with two cheap SN65HVD230 breakouts, one transmittin
 
 ## What broke
 
-- **Bus-off proof drowned in its own logging.** The alert handler logged every bus error, hundreds of lines a second. Counting errors and printing the count on the stats line made the bus-off transition visible. Fault handlers count, they do not narrate.
+- **Bus-off proof drowned in its own logging.** The alert handler logs a line for every bus error alert, which at 500 kbit/s is a wall of text. Counting bus-off and recovery events and printing them on the 5 s stats line (`bus_off=`, `recovered=`) is what made the bus-off transition visible. Fault handlers count, they do not narrate.
 - **`tx_ok` does not mean sent.** `twai_transmit()` returns OK when the frame is queued. Reading `tx_q` is what tells you if anything left.
 - **A cold solder joint** on one of the first breakouts. Header pin read 3.3 V while the IC leg read 0 V.
 - **MCP2551 is a 5 V part** and the ESP32 pins are not 5 V tolerant. Checked before wiring.

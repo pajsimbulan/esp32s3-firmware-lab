@@ -23,7 +23,7 @@ A Bluetooth Low Energy peripheral. The board advertises as `lab14-vib`, exposes 
 
 - **GATT is a table.** A service groups characteristics, a characteristic holds a value plus flags, and the CCCD descriptor is where the phone writes to turn notifications on.
 - **Read vs Notify.** Read is pull: the phone asks and `vib_access_cb` answers with the current value. Notify is push: the board sends every 500 ms without being asked, which is how real BLE sensors work.
-- **Nothing arrives until the phone subscribes.** Notifications go out only after the client writes the CCCD. Skipping that step is the number one "my app receives nothing" bug.
+- **Nothing shows up until the phone subscribes.** The board calls `ble_gatts_notify_custom()` every 500 ms whether or not anyone subscribed, because that call does not check the CCCD. The phone only shows the values after it writes the CCCD, which the board logs as a `BLE_GAP_EVENT_SUBSCRIBE`. Skipping that step is the number one "my app receives nothing" bug.
 - **BLE has no types.** The value is 4 raw bytes. `CD CC 4C 3D` reversed is `0x3D4CCCCD`, which is IEEE-754 for 0.05, matching the first `rms = 0.0500` in the log. Byte order and float layout, worked by hand.
 - **The connection handle goes stale.** On disconnect the stored handle is cleared and advertising restarts, so a dead handle is never used for a notify.
 

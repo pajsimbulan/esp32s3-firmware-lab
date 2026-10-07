@@ -18,7 +18,7 @@ Twenty-four firmware labs on the ESP32-S3, written in C with ESP-IDF and FreeRTO
 
 This is one of my two firmware projects. I did this series over the summer to really master the concepts, and then put them to work in my bigger project, Oscil, a two-channel oscilloscope and function generator built on three ESP32-S3s. The labs are the breadth, Oscil is the depth.
 
-At CSUN, ECE 425 taught me embedded systems on the TI TM4C123: bare-metal C, registers, no operating system. I wanted the other half too. I picked the ESP32-S3 because it has everything in one cheap board: two cores, Wi-Fi, BLE, a CAN controller, DMA on almost every peripheral, 8 MB of PSRAM, and a built-in USB JTAG debugger. And ESP-IDF runs on FreeRTOS, so every lab doubled as RTOS practice next to the bare-metal work I was doing at university.
+At CSUN, ECE 425 taught me embedded systems on the TI TM4C123: bare-metal C, registers, no operating system. I wanted the other half too. I picked the ESP32-S3 because it has everything in one cheap board: two cores, Wi-Fi, BLE, a CAN controller, DMA on almost every peripheral, 8 MB of PSRAM, and a built-in USB JTAG debugger. And ESP-IDF runs on FreeRTOS, so every lab doubled as RTOS practice next to the bare-metal work I was doing at university. The labs use the ESP-IDF drivers, so the focus is on how each peripheral and the RTOS behave. Writing my own register-level drivers came later, in Oscil.
 
 The format is a love letter to classroom labs. Each one has a goal, a build, a measurement and a write-up of what went wrong. A semester usually has 8 to 12 labs. This has 24, and the second half goes well past what a class covers: CAN, OTA with rollback, priority inversion, DMA, hardware watchpoints, and a factory test station.
 
@@ -33,10 +33,10 @@ Every lab README has a **What broke** section, because the bugs are where most o
 | 0 | [Toolchain and first flash](Lab0) | ESP-IDF project layout, CMake, build, flash and monitor |
 | 1 | [GPIO: RGB LED and button](Lab1) | Pin config, pull-ups, active-low input, debounce |
 | 2 | [FreeRTOS tasks](Lab2) | Priorities, task states, drift-free `vTaskDelayUntil` |
-| 3 | [UART and loopback](Lab3) | 8N1 framing, driver ring buffers, a line command parser |
-| 4 | [Hardware timers](Lab4) | GPTimer ISR, 500 Hz toggle verified on a logic analyzer |
+| 3 | [UART and loopback](Lab3) | 8N1 framing, the UART driver and its RX ring buffer, a loopback self-test |
+| 4 | [Hardware timers](Lab4) | Periodic `esp_timer` callback, 500 Hz toggle verified on a logic analyzer |
 | 5 | [I2C and an IMU](Lab5) | Address probe, `WHO_AM_I`, burst reads, raw to g |
-| 6 | [PWM with LEDC](Lab6) | Duty vs resolution vs frequency, hardware fade |
+| 6 | [PWM with LEDC](Lab6) | Duty vs resolution vs frequency, a task-driven LED fade |
 | 7 | [Sensor pipeline](Lab7) | Producer and consumer tasks, semaphores, RMS and peak |
 
 ### Past the coursework
@@ -67,9 +67,9 @@ Every lab README has a **What broke** section, because the bugs are where most o
 
 ## Skills
 
-- **C for microcontrollers:** `volatile`, ISR-safe code, fixed-size buffers, bit fields, struct layout, IEEE-754 and endianness by hand
+- **C for microcontrollers:** `volatile`, ISR-safe code, fixed-size buffers, struct layout, IEEE-754 floats and endianness by hand
 - **Buses:** GPIO, UART, I2C, SPI, CAN (TWAI), USB
-- **Timing:** hardware timers, PWM, fixed-rate loops, jitter measured with a logic analyzer
+- **Timing:** `esp_timer`, LEDC PWM, fixed-rate loops, timing checked with a logic analyzer
 - **FreeRTOS:** tasks, priorities, core pinning, queues, semaphores, mutexes, priority inheritance, task notifications
 - **DMA:** continuous ADC, SPI display with ping-pong buffers
 - **Connectivity:** Wi-Fi, HTTP and JSON, BLE GATT with NimBLE, OTA updates with rollback
