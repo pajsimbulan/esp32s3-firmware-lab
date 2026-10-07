@@ -3,7 +3,9 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
+#include <string.h>
 #include "driver/i2c_master.h"
+#include "driver/uart.h"
 #include "esp_timer.h"
 #include "esp_log.h"
 
@@ -12,6 +14,9 @@
 #define MPU_ADDR 0x68
 #define FS_HZ 1000 //sample rate
 #define WIN 256 //samples per feature window (~256ms)
+#define U_PORT UART_NUM_1 //UART log output, looped back TX17 -> RX18 (lab 3)
+#define TX_PIN 17
+#define RX_PIN 18
 
 static const char *TAG = "vib";
 static i2c_master_dev_handle_t mpu;
@@ -59,6 +64,18 @@ static void feature_task(void *arg) {
         float rms = sqrtf(ss/WIN); // AC RMS of the signal magnitude
         ESP_LOGI(TAG, "rms=%.4f peak=%.4f", rms, peak);
 
+        //UART log: send the result out TX, read it back on RX through the loopback wire
+        char line[48];
+        int len = snprintf(line, sizeof(line), "rms=%.4f peak=%.4f\r\n", rms, peak);
+        uart_flush_input(U_PORT); //drop stale bytes so each read lines up with this message
+        uart_write_bytes(U_PORT, line, len);
+        uint8_t rx[48];
+        int n = uart_read_bytes(U_PORT, rx, len, pdMS_TO_TICKS(20));
+        if(n > 0) {
+            rx[n] = 0;
+            ESP_LOGI(TAG, "uart looped back: %s", (char *)rx);
+        } else ESP_LOGW(TAG, "uart: nothing came back, check the TX17 -> RX18 wire");
+
     }
 }
 
@@ -84,6 +101,19 @@ void app_main(void)
     i2c_master_bus_add_device(bus, &dev_cfg, &mpu);
     uint8_t wake[2] = {0x6B, 0x00};
     i2c_master_transmit(mpu, wake, 2, 1000); //wake from sleep
+
+    // --- UART log bring-up (same as lab 3) ---
+    uart_config_t ucfg = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity    = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_DEFAULT,
+    };
+    uart_driver_install(U_PORT, 1024, 0, 0, NULL, 0);
+    uart_param_config(U_PORT, &ucfg);
+    uart_set_pin(U_PORT, TX_PIN, RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 
     // --- plumbing ---
     tick_sem = xSemaphoreCreateBinary();
