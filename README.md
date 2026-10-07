@@ -16,13 +16,13 @@ Twenty-four firmware labs on the ESP32-S3, written in C with ESP-IDF and FreeRTO
 
 ## The story
 
-I did this series over the summer to really master the concepts before my bigger project, Oscil.
+This is one of my two firmware projects. I did this series over the summer to really master the concepts, and then put them to work in my bigger project, Oscil, a two-channel oscilloscope and function generator built on three ESP32-S3s. The labs are the breadth, Oscil is the depth.
 
 At CSUN, ECE 425 taught me embedded systems on the TI TM4C123: bare-metal C, registers, no operating system. I wanted the other half too. I picked the ESP32-S3 because it has everything in one cheap board: two cores, Wi-Fi, BLE, a CAN controller, DMA on almost every peripheral, 8 MB of PSRAM, and a built-in USB JTAG debugger. And ESP-IDF runs on FreeRTOS, so every lab doubled as RTOS practice next to the bare-metal work I was doing at university.
 
 The format is a love letter to classroom labs. Each one has a goal, a build, a measurement and a write-up of what went wrong. A semester usually has 8 to 12 labs. This has 24, and the second half goes well past what a class covers: CAN, OTA with rollback, priority inversion, DMA, hardware watchpoints, and a factory test station.
 
-Every lab README has a **Coming from the TM4C123** note that compares it to what I learned in class, and a **What broke** section, because the bugs are where most of the learning happened.
+Every lab README has a **What broke** section, because the bugs are where most of the learning happened.
 
 ## Labs
 
@@ -123,11 +123,5 @@ Wi-Fi credentials go in `idf.py menuconfig` and stay in `sdkconfig`, which is no
 - **The FreeRTOS tick defaults to 100 Hz.** Then `pdMS_TO_TICKS(1)` is zero. Labs that need 1 ms set it to 1000.
 - **The two USB-C ports are different.** One is native USB with JTAG, the other is a USB-UART bridge. Some labs need the second.
 - **Do not use GPIO26 to 37 on the N16R8.** They are wired to flash and PSRAM.
-
-## About
-
-**Paul Simbulan.** MSEE candidate at California State University, Northridge. BS in Computer Science from UC Santa Cruz. Earlier embedded work on the TM4C123 and MSP432.
-
-[paulsimbulan.com](https://paulsimbulan.com) · [github.com/pajsimbulan](https://github.com/pajsimbulan) · [linkedin.com/in/pauljsimbulan](https://linkedin.com/in/pauljsimbulan)
 
 MIT licensed.
