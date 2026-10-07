@@ -1,98 +1,65 @@
 # Lab 8: GPIO Interrupts and ISR-Safe Code
 
-Edge-triggered interrupts on a real button, an ISR that does nothing but post an event, and a worker task that does the actual work. The universal "keep ISRs tiny" pattern, plus the memory-placement rules that make an ISR safe to run at all.
+An edge interrupt on a real button, an ISR that only posts an event, and a worker task that does the actual work. The "keep ISRs tiny" pattern, plus the memory rules that make an ISR safe to run at all. I also used this lab's firmware for the debugging clinic: halting it live over the built-in JTAG and breaking inside the interrupt handler.
+
+![GDB stopped inside the button ISR with the full interrupt path in the backtrace](screenshots/lab08_proof_gdb_break_inside_button_isr.png)
+
+*GDB halted inside `btn_isr` the moment BOOT was pressed. Read the backtrace bottom up: idle task asleep, level 1 interrupt vector, shared GPIO ISR service, then my handler with `arg = 0` for GPIO0.*
+
+| Halt at `app_main` | Reading a crash dump |
+|---|---|
+| ![GDB halted at app_main](screenshots/lab08_proof_gdb_halt_at_app_main.png) | ![Anatomy of a Guru Meditation crash dump](screenshots/lab08_concept_reading_a_crash_dump.png) |
 
 | | |
 |---|---|
-| **Target** | ESP32-S3 N16R8 |
-| **Peripherals** | GPIO interrupt, FreeRTOS queue |
-| **Pins** | GPIO0 BOOT button, falling-edge triggered |
-| **Key APIs** | `gpio_install_isr_service()`, `gpio_isr_handler_add()`, `xQueueCreate()`, `xQueueSendFromISR()`, `xQueueReceive()`, `portYIELD_FROM_ISR()`, `IRAM_ATTR` |
-| **Instrumentation** | FX2LP analyzer on GPIO0 at 12 MHz to resolve contact bounce |
-
----
-
-## Objective
-
-Replace Lab 1's polling loop with a hardware interrupt, and structure the handler the way production firmware does: the ISR captures which pin fired and posts it to a queue, and a task blocked on that queue performs the debounce and the response.
-
----
+| **Board** | ESP32-S3 N16R8 |
+| **Peripherals** | GPIO interrupt, FreeRTOS queue, built-in USB-Serial-JTAG |
+| **Pins** | GPIO0 BOOT button, falling edge |
+| **Key APIs** | `gpio_install_isr_service()`, `gpio_isr_handler_add()`, `xQueueCreate()`, `xQueueSendFromISR()`, `portYIELD_FROM_ISR()`, `IRAM_ATTR` |
+| **Tools** | OpenOCD `board/esp32s3-builtin.cfg`, `xtensa-esp32s3-elf-gdb`, Zadig (WinUSB on interface 2) |
 
 ## How it works
 
-### The two-part handler
+- **Two halves.** The ISR reads which pin fired, pushes it into a queue, asks for a context switch and returns. Debounce, logging and the response happen in a normal task. Linux calls this top half and bottom half.
+- **`FromISR` versions.** `xQueueSend` can block, and you cannot block in an interrupt. `xQueueSendFromISR` never blocks and reports whether it woke a higher priority task. `portYIELD_FROM_ISR()` then switches straight to that task instead of waiting up to a full tick.
+- **`IRAM_ATTR`.** Code normally runs from flash through a cache. A miss in an ISR stalls, and if the flash is busy being written it cannot be fetched at all. `IRAM_ATTR` puts the handler in internal RAM. The debugger proves it: `btn_isr` sits at `0x40376884` in IRAM while `app_main` is up at `0x42...` in flash.
+- **The catch.** `IRAM_ATTR` covers the function, not what it touches. String literals and called functions can still live in flash, which is why `ESP_LOGI` in an ISR is the classic mistake.
 
-The ISR runs with interrupts disabled on that core, so every microsecond it spends is latency added to every other interrupt in the system. It therefore does the minimum: read the pin number, push it into a queue, request a context switch, return. Everything with variable cost (debouncing, logging, driving the LED) happens in a normal task.
+## Debugging clinic: halting it live
 
-This split has names in other ecosystems (top half and bottom half in Linux, deferred procedure call in Windows) and it comes up by name in interviews. The ESP-IDF version is the ISR plus a queue plus a worker task.
+1. Bound WinUSB to **USB JTAG/serial debug unit (Interface 2)** in Zadig. Interface 0 is the COM port and must be left alone.
+2. `openocd -f board/esp32s3-builtin.cfg` found both cores and opened a GDB server on port 3333.
+3. In a second terminal: `xtensa-esp32s3-elf-gdb build/Lab8.elf`, then `target remote :3333`, `mon reset halt`, `thb app_main`, `c`.
+4. `bt` showed `app_main` called from ESP-IDF's `main_task`. Then `b btn_isr`, `c`, press BOOT, `bt` again for the shot above.
 
-### `xQueueSendFromISR` and the yield
+Pressing Enter on an empty `(gdb)` line repeats the last command, which once sent me straight past `app_main` into the idle task. That stop was useful too: the idle task sitting in `esp_cpu_wait_for_intr()` is exactly what a sleeping CPU looks like.
 
-`xQueueSend` can block if the queue is full, and blocking in interrupt context is impossible: there is no task to suspend. The `FromISR` variant never blocks and instead returns failure, and it outputs `pxHigherPriorityTaskWoken` through a pointer.
+## Coming from the TM4C123
 
-That flag matters. If posting to the queue unblocked a task of higher priority than whatever was interrupted, `portYIELD_FROM_ISR()` makes the scheduler switch to it the moment the ISR returns, rather than waiting for the next tick. At a 100 Hz tick that is the difference between microseconds of latency and up to 10 milliseconds.
+The TM4C version was raw NVIC work: pick the edge in `GPIOIS`, `GPIOIBE` and `GPIOIEV`, enable it in `GPIOIM` and `NVIC_EN0`, and clear the flag in `GPIOICR` or the interrupt fires forever. Deferring meant setting a global flag and hoping the superloop noticed. Here the ISR can wake a specific task at a specific priority.
 
-### `IRAM_ATTR` and why it is not decoration
+## Results
 
-Application code lives in flash and is reached through a cache. A cache miss stalls while the fetch completes, which is fine in a task and unacceptable in an ISR, and outright fatal if the interrupt fires while the flash controller is busy (during an SPI flash write, for instance) because the code simply cannot be fetched.
-
-`IRAM_ATTR` places the function in internal RAM, which is always accessible with deterministic timing. The subtlety that catches people is that it covers the **function**, not what the function touches: string literals still live in `.rodata` in flash, and any non-IRAM function called from the ISR is still a flash fetch. `ESP_LOGI` inside an ISR is the standard version of this mistake.
-
-### The queue handle is opaque
-
-`xQueueCreate(8, sizeof(uint32_t))` heap-allocates a control block holding the storage buffer, head and tail indices, item count, item size, and the lists of tasks blocked on it, and returns an opaque pointer. You cannot dereference it, deliberately, so FreeRTOS can change its internals without breaking application code. Same pattern as `i2c_master_dev_handle_t` in Lab 5 and `SemaphoreHandle_t` in Lab 7: one concept, three appearances.
-
----
-
-## TM4C123 bridge
-
-On the TM4C this was raw NVIC work: enable the interrupt in `GPIOIM`, select the edge in `GPIOIS` / `GPIOIBE` / `GPIOIEV`, set priority in the NVIC priority registers, enable it in `NVIC_EN0`, and then in the handler **clear the flag in `GPIOICR`** or the interrupt re-fires forever. The vector table entry was placed by hand in the startup file.
-
-The hardware layer here is identical in spirit; `gpio_install_isr_service()` installs one shared handler and `gpio_isr_handler_add()` registers per-pin callbacks that it dispatches to, and the flag clearing happens inside that shared handler.
-
-What is genuinely new is that there is somewhere to defer work **to**. On the TM4C, deferring meant setting a global flag and hoping the superloop got around to it. Here the ISR can wake a specific task at a specific priority and the scheduler enforces it.
-
----
-
-## Verification
-
-| Acceptance criterion | How it was confirmed |
+| Check | Result |
 |---|---|
-| Interrupt fires on press | Worker task logs one event per physical press |
-| ISR stays minimal | No logging, no delays, no blocking calls inside the handler |
-| Edge behavior confirmed physically | PulseView capture of GPIO0 at 1 µs resolution; the **release edge is clean** with no measurable bounce |
-| Queue decouples correctly | Worker's 20 ms debounce delay does not affect interrupt latency |
-
-Press-edge bounce measurement is still outstanding. Noted honestly rather than claimed.
-
----
+| Interrupt fires | One `button press handled (gpio 0)` per press |
+| ISR stays minimal | No logging, no delays, no blocking calls inside |
+| Queue decouples | The worker's 20 ms debounce does not affect interrupt latency |
+| JTAG attach | OpenOCD sees both cores, GDB halts at `app_main` |
+| Live ISR break | GDB stops inside `btn_isr` on a real press |
 
 ## What broke
 
-**The interrupt was enabled before the handler was registered.**
-`gpio_config()` with `.intr_type` set arms the interrupt at configuration time, and `gpio_isr_handler_add()` came after it in my code. Any edge arriving in that window dispatches into a handler that does not exist yet. It never bit me in practice because a human cannot press a button that fast, which is exactly what makes it a dangerous ordering bug: correct-looking, untested by the physical world, and fatal the moment the interrupt source is something faster than a finger. Configure the pin, register the handler, then enable.
-
-**The debounce filter failed on held presses.**
-The worker's fixed `vTaskDelay` after an event assumes the button is released within that window. Holding it produces repeat events. Correct for the lab, wrong as a general debouncer, and documented rather than hidden.
-
-**A log timestamp pattern I nearly ignored.**
-Events were spaced exactly 20 ms apart, which was suspiciously exactly my own debounce delay value rather than any property of the hardware. Following that observation to a measurement rather than stopping at the hypothesis is the habit this whole track is training.
-
----
+- **The interrupt was armed before its handler existed.** `gpio_config()` with an interrupt type arms it right away, and I registered the handler after. A finger cannot press that fast, which is what makes it dangerous. Configure, register, then enable.
+- **Held presses repeat.** The fixed debounce delay assumes the button is released. Fine for the lab, documented rather than hidden.
+- **Events exactly 20 ms apart.** Suspiciously equal to my own debounce delay, not a property of the button. Following that to a measurement instead of a guess is the habit this whole series is about.
+- **Zadig showed an empty list.** It hides devices that already have a driver. Options, List All Devices.
 
 ## Build
 
 ```powershell
-idf.py set-target esp32s3
-idf.py build
-idf.py -p COM3 flash monitor
+idf.py build flash monitor
+# debugging, two terminals:
+openocd -f board/esp32s3-builtin.cfg
+xtensa-esp32s3-elf-gdb build/Lab8.elf
 ```
-
-Analyzer: CH0 to GPIO0, GND to GND, 12 MHz with a falling-edge trigger to catch bounce.
-
----
-
-## References
-
-- ESP-IDF Programming Guide v5.5, *GPIO* (interrupt section), *Interrupt Allocation*, *Memory Types* (IRAM/DRAM/flash cache)
-- FreeRTOS API reference: `xQueueSendFromISR`, `portYIELD_FROM_ISR`
