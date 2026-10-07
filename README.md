@@ -1,6 +1,6 @@
 # esp32s3-firmware-lab
 
-Twenty-four firmware labs on the ESP32-S3, written in C with ESP-IDF and FreeRTOS, and every one run on real hardware. GPIO to CAN bus, interrupts to OTA rollback, a logic analyzer on the pins and GDB on the CPU.
+Twenty-four firmware labs on the ESP32-S3, written in C with ESP-IDF and FreeRTOS for real hardware, and 23 of them backed by bench logs, captures or video. GPIO to CAN bus, interrupts to OTA rollback, a logic analyzer on the pins and GDB on the CPU.
 
 ![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v5.5.5-red)
 ![Target](https://img.shields.io/badge/target-ESP32--S3-blue)
@@ -18,7 +18,7 @@ Twenty-four firmware labs on the ESP32-S3, written in C with ESP-IDF and FreeRTO
 
 This is one of my two firmware projects. I did this series over the summer to really master the concepts, and then put them to work in my bigger project, Oscil, a two-channel oscilloscope and function generator built on three ESP32-S3s. The labs are the breadth, Oscil is the depth.
 
-At CSUN, ECE 425 taught me embedded systems on the TI TM4C123: bare-metal C, registers, no operating system. I wanted the other half too. I picked the ESP32-S3 because it has everything in one cheap board: two cores, Wi-Fi, BLE, a CAN controller, DMA on almost every peripheral, 8 MB of PSRAM, and a built-in USB JTAG debugger. And ESP-IDF runs on FreeRTOS, so every lab doubled as RTOS practice next to the bare-metal work I was doing at university. The labs use the ESP-IDF drivers, so the focus is on how each peripheral and the RTOS behave. Writing my own register-level drivers came later, in Oscil.
+At CSUN, ECE 425 taught me embedded systems on the TI TM4C123: bare-metal C, registers, no operating system. I wanted the other half too. I picked the ESP32-S3 because it has everything in one cheap board: two cores, Wi-Fi, BLE, a CAN controller, a DMA engine shared by SPI, the ADC and other peripherals, 8 MB of PSRAM on the N16R8 module, and a built-in USB JTAG debugger. And ESP-IDF runs on FreeRTOS, so every lab doubled as RTOS practice next to the bare-metal work I was doing at university. The labs use the ESP-IDF drivers, so the focus is on how each peripheral and the RTOS behave. Writing my own register-level drivers came later, in Oscil.
 
 The format is a love letter to classroom labs. Each one has a goal, a build, a measurement and a write-up of what went wrong. A semester usually has 8 to 12 labs. This has 24, and the second half goes well past what a class covers: CAN, OTA with rollback, priority inversion, DMA, hardware watchpoints, and a factory test station.
 
@@ -48,7 +48,7 @@ Every lab README has a **What broke** section, because the bugs are where most o
 | 10 | [NVS storage](Lab10) | Key value storage that survives reset, partition tables |
 | 11 | [Unit tests on the target](Lab11) | Unity tests running on the chip, logic split from hardware |
 | 12 | [Deep sleep](Lab12) | Wake sources, RTC memory, power domains |
-| 13 | [Wi-Fi telemetry](Lab13) | Station mode, event handling, JSON HTTP POST to a laptop |
+| 13 | [Wi-Fi telemetry](Lab13) | Station mode, the Wi-Fi event sequence, JSON HTTP POST to a laptop |
 | 14 | [BLE GATT server](Lab14) | NimBLE service, notifications to a phone, the 31-byte advertising limit |
 | 15 | [OTA with rollback](Lab15) | A/B slots, self-test, automatic rollback caught on the bench |
 | 16 | [Priority inversion](Lab16) | 800 ms with a semaphore, 300 ms with a mutex, 30 trials each |
@@ -68,7 +68,7 @@ Every lab README has a **What broke** section, because the bugs are where most o
 ## Skills
 
 - **C for microcontrollers:** `volatile`, ISR-safe code, fixed-size buffers, struct layout, IEEE-754 floats and endianness by hand
-- **Buses:** GPIO, UART, I2C, SPI, CAN (TWAI), USB
+- **Buses:** GPIO, UART, I2C, SPI, CAN (TWAI)
 - **Timing:** `esp_timer`, LEDC PWM, fixed-rate loops, timing checked with a logic analyzer
 - **FreeRTOS:** tasks, priorities, core pinning, queues, semaphores, mutexes, priority inheritance, task notifications
 - **DMA:** continuous ADC, SPI display with ping-pong buffers

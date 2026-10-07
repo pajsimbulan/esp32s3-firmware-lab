@@ -45,7 +45,7 @@ Bringing up a real sensor from its datasheet. Reading the device ID, waking the 
 
 - **`WHO_AM_I` returned `0x70`, not the `0x68` every tutorial expects.** The breakout carries an **MPU-6500**, not an MPU-6050. `0x70` is its real ID, and the bus address is a different number entirely. Every register used here is the same across the family. Reading a consistent unexpected value meant the wiring was right, and the TDK register map confirmed it.
 - **Every axis read a constant 1.88 g.** The reads were failing and my code ignored the return value, so it printed leftover stack bytes. The wires were on the wrong header pins. On this board the silkscreen IO number and the header position differ (IO8 is header pin 12, IO9 is pin 15). Checking `esp_err_t` on a read turned the silent failure into a clear NACK. The current `main.c` still ignores the return values of `mpu_read()` and `mpu_write()`, so that check is worth adding back.
-- **The bus ran at 100 kHz while the code said 400 kHz.** It did not show up here. It showed up in Lab 7 as a slow sample rate.
+- **A 100 kHz bus where 400 kHz was intended.** Not here, this lab measured about 399 kHz. Lab 7 had SCL set to 100 kHz by mistake, and it showed up there as a slow sample rate.
 
 ## Build
 
