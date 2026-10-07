@@ -12,7 +12,7 @@ static void post_reading(float rms, float peak) {
     int n = snprintf(body, sizeof(body), "{\"rms\":%.4f,\"peak\":%.4f}", rms, peak);
 
     esp_http_client_config_t cfg = {
-        .url = "http://172.20.10.3:8000/telemetry", //your laptop's IP + port
+        .url = "http://172.20.10.5:8000/telemetry",
         .method = HTTP_METHOD_POST,
     };
 
