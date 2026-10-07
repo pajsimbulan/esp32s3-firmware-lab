@@ -15,6 +15,7 @@
 
 /**
  * 
+ */
  void app_main(void)
  {
     uart_config_t cfg = {
@@ -36,17 +37,15 @@
             if(n>0) {
                 rx[n] = 0;
                 ESP_LOGI("lab3", "looped back: %s", (char *)rx);
-                }
-                vTaskDelay(pdMS_TO_TICKS(500));
-                }
-                }
+            }
+            vTaskDelay(pdMS_TO_TICKS(500));
+        }
 }
-*/
+
                
 /**\
 * try it yourself exercise
-*/
-               
+
 
 #include <stdbool.h>
 #include "driver/usb_serial_jtag.h"
@@ -61,12 +60,12 @@ static led_strip_handle_t strip;
 static bool led_on = false; //shadow state: WS2812 cannot be read back
 
 static void led_init(void) {
-      led_strip_config_t strip_cfg = {
-    .strip_gpio_num = LED_PIN,
-    .max_leds       = LED_COUNT,
+    led_strip_config_t strip_cfg = {
+        .strip_gpio_num = LED_PIN,
+        .max_leds       = LED_COUNT,
 };
-    led_strip_rmt_config_t rmt_cfg = {.resolution_hz = 10*1000*1000,}; //10 Mhz -> 0.1us per tick
-    ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_cfg, &rmt_cfg, &strip));
+led_strip_rmt_config_t rmt_cfg = {.resolution_hz = 10*1000*1000,}; //10 Mhz -> 0.1us per tick
+ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_cfg, &rmt_cfg, &strip));
     led_strip_clear(strip);// start dark
 };
 
@@ -101,10 +100,10 @@ void app_main(void) {
     ESP_ERROR_CHECK(usb_serial_jtag_driver_install(&usb_cfg));
     ESP_LOGI(TAG, "ready. commands: led on/ led off / led status");
     uint8_t rx[64];  //scratch: bytes that arrived this iteration
-
+    
     char line[CMD_LINE_MAX];
     int idx = 0;
-
+    
     while(1) {
         int n = usb_serial_jtag_read_bytes(rx, sizeof(rx), pdMS_TO_TICKS(20));
         for (int i =0; i<n; i++) {
@@ -121,6 +120,7 @@ void app_main(void) {
                 idx =0;
             }
         }
-
+        
     }
 }
+    */

@@ -7,7 +7,7 @@
     "--query-driver=**",
     "--compile-commands-dir=d:\\Codes\\ESP32\\Lab3\\build"
   ],
-  "idf.currentSetup": "D:\\esp\\v5.5.5\\esp-idf",
+  "idf.currentSetup": "C:\\esp\\v5.5.5\\esp-idf",
   "idf.flashType": "UART",
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32s3"
@@ -15,5 +15,6 @@
   "idf.portWin": "COM3",
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
-  ]
+  ],
+  "idf.port": "COM7"
 }

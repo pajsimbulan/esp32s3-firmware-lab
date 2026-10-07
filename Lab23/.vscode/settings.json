@@ -32,5 +32,6 @@
     "board/esp32s3-builtin.cfg"
   ],
   "idf.currentSetup": "C:\\esp\\v5.5.5\\esp-idf",
-  "idf.portWin": "COM3"
+  "idf.portWin": "COM3",
+  "idf.port": "COM8"
 }
