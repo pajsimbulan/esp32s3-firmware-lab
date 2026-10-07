@@ -23,10 +23,6 @@ A real test suite running on the microcontroller. The Lab 7 feature math pulled 
 - **Float tolerance.** Exact float equality is almost always the wrong assertion, so `TEST_ASSERT_FLOAT_WITHIN` is used throughout.
 - **Edge cases.** A window of length 0 divides by zero, and that is the one the original code actually gets wrong.
 
-## Coming from the TM4C123
-
-There was nothing like this. Verification meant flashing and watching an LED or a serial line, which only checks the case you thought to try, and only right now.
-
 ## Results
 
 | Check | Result |

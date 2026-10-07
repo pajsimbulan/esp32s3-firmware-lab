@@ -2,7 +2,7 @@
 
 A Bluetooth Low Energy peripheral. The board advertises as `lab14-vib`, exposes a custom service with one characteristic carrying the live RMS value, and pushes it to a phone with notifications. Verified in nRF Connect.
 
-[![Phone and serial log side by side while notifications stream](screenshots/lab14_demo_ble_notify_phone_and_log_poster.jpg)](screenshots/lab14_demo_ble_notify_phone_and_log.mp4)
+<a href="screenshots/lab14_demo_ble_notify_phone_and_log.mp4"><img src="screenshots/lab14_demo_ble_notify_phone_and_log_poster.jpg" width="220" alt="Phone and serial log side by side while notifications stream"></a>
 
 *Click to play. Left: the board logs `connected`, `subscribe ... notify=1` and each notify. Right: nRF Connect finds `lab14-vib`, connects, and the value updates on its own.*
 
@@ -26,10 +26,6 @@ A Bluetooth Low Energy peripheral. The board advertises as `lab14-vib`, exposes 
 - **Nothing arrives until the phone subscribes.** Notifications go out only after the client writes the CCCD. Skipping that step is the number one "my app receives nothing" bug.
 - **BLE has no types.** The value is 4 raw bytes. `CD CC 4C 3D` reversed is `0x3D4CCCCD`, which is IEEE-754 for 0.05, matching the first `rms = 0.0500` in the log. Byte order and float layout, worked by hand.
 - **The connection handle goes stale.** On disconnect the stored handle is cleared and advertising restarts, so a dead handle is never used for a notify.
-
-## Coming from the TM4C123
-
-The ECE 425 final used an HM-10 module, which is a BLE chip that pretends to be a UART. Here the BLE host stack runs on my MCU and I define the GATT table myself.
 
 ## Results
 

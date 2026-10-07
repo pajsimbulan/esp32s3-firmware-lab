@@ -6,13 +6,13 @@ The bus inside cars and industrial machines. Two ESP32-S3 boards, each with its 
 
 *PulseView decodes Node 2's frame: ID `0x456`, DLC 5, `DE AD BE EF 8A`, CRC and end of frame. The flat trace that dips once near the end is Node 1's TX driving the ACK bit. The log below shows `tx_ok=511 tx_fail=0 bus_off=0`.*
 
-[![Two nodes exchanging frames at 125 kbit/s](screenshots/lab17_demo_can_two_nodes_125k_poster.jpg)](screenshots/lab17_demo_can_two_nodes_125k.mp4)
+<a href="screenshots/lab17_demo_can_two_nodes_125k.mp4"><img src="screenshots/lab17_demo_can_two_nodes_125k_poster.jpg" width="220" alt="Two nodes exchanging frames at 125 kbit/s"></a>
 
 *Click to play. Both boards on the bus at 125 kbit/s, each receiving the other's ID every 500 ms with zero errors.*
 
 | Node 1's frame, the other direction | The 500 kbit/s failure |
 |---|---|
-| ![Frame 0x123 decoded](screenshots/lab17_proof_can_frame_0x123_decoded.png) | [![Bus errors and bus-off at 500 kbit/s](screenshots/lab17_demo_can_500k_bus_errors_bus_off_poster.jpg)](screenshots/lab17_demo_can_500k_bus_errors_bus_off.mp4) |
+| ![Frame 0x123 decoded](screenshots/lab17_proof_can_frame_0x123_decoded.png) | <a href="screenshots/lab17_demo_can_500k_bus_errors_bus_off.mp4"><img src="screenshots/lab17_demo_can_500k_bus_errors_bus_off_poster.jpg" width="220" alt="Bus errors and bus-off at 500 kbit/s"></a> |
 
 | The bus and a frame | Arbitration |
 |---|---|
@@ -48,10 +48,6 @@ Checked against the NXP TJA1051 datasheet: 250 ns max loop delay and rated to 5 
 ## Earlier attempt
 
 My first try used one ESP32 with two cheap SN65HVD230 breakouts, one transmitting and one listening. Single transceiver loopback passed on all three boards, but the two-transceiver path always went bus-off. It was really one controller talking to itself, so I rebuilt the test as a real two-node network with two boards and new transceivers.
-
-## Coming from the TM4C123
-
-The TM4C123 has a CAN controller and ECE 425 never touched it. Nothing to bridge from.
 
 ## Results
 

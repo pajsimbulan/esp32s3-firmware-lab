@@ -8,7 +8,7 @@ The other serial bus. Full duplex framing, clock polarity and phase, chip select
 
 | Bench | SPI modes |
 |---|---|
-| ![SPI loopback wired to the logic analyzer](screenshots/lab09_bench_spi_loopback_with_analyzer.jpg) | ![The four SPI modes](screenshots/lab09_concept_spi_modes.png) |
+| <img src="screenshots/lab09_bench_spi_loopback_with_analyzer.jpg" width="260" alt="SPI loopback wired to the logic analyzer"> | ![The four SPI modes](screenshots/lab09_concept_spi_modes.png) |
 
 | Shared bus, one CS per device | Full duplex |
 |---|---|
@@ -29,10 +29,6 @@ The other serial bus. Full duplex framing, clock polarity and phase, chip select
 - **Length is in bits.** `t.length = 8 * sizeof(tx)`. A classic trap.
 - **Parameters that read as one thing and mean another.** `max_transfer_sz` is bytes. `queue_size` is how many transactions can wait, not a buffer size. `SPI_DMA_CH_AUTO` lets the DMA engine move the bytes.
 - **SPI vs I2C, the actual interview question.** SPI has no address and no ACK. A CS wire picks the device and the master has no idea if anyone listened. I2C uses an address on the wire and gets an ACK per byte. SPI trades wires for speed and simplicity.
-
-## Coming from the TM4C123
-
-The TM4C's SSI module was set up in `SSICR0` (frame format, plus SPH and SPO, which are CPHA and CPOL under other names) and `SSICR1`, clocked by `SSICPSR`, with polling on `SSISR` around every `SSIDR` write. Same four wires and modes. New here: describing a transfer as a struct, and DMA.
 
 ## Results
 

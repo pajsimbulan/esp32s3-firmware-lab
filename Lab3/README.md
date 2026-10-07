@@ -2,7 +2,7 @@
 
 Asynchronous serial from the wire up. Framing and baud error, the driver's ring buffers, a physical loopback that proves the peripheral before trusting it, and a line parser that handles bytes arriving one at a time.
 
-[![UART loopback with the jumper pulled and put back](screenshots/lab03_demo_uart_loopback_wire_pulled_poster.jpg)](screenshots/lab03_demo_uart_loopback_wire_pulled.mp4)
+<a href="screenshots/lab03_demo_uart_loopback_wire_pulled.mp4"><img src="screenshots/lab03_demo_uart_loopback_wire_pulled_poster.jpg" width="220" alt="UART loopback with the jumper pulled and put back"></a>
 
 *Click to play. GPIO17 is jumpered to GPIO18. Pulling the wire stops the looped-back data, and putting it back brings it back.*
 
@@ -23,10 +23,6 @@ Asynchronous serial from the wire up. Framing and baud error, the driver's ring 
 - **The driver owns two ring buffers.** After `uart_driver_install()` an ISR drains and fills the hardware FIFO. `uart_write_bytes()` copies into the TX ring and returns, which is why the UART keeps working while my task is busy.
 - **Prove the bus alone first.** The loopback answers "is my peripheral set up right" with no second device in the picture. The same habit shows up again in Lab 9 (SPI) and Lab 17 (CAN).
 - **The parser.** Keystrokes arrive one at a time, so it keeps a buffer and an index that survive across reads, and dispatches on `\r` or `\n`. A terminal sending `\r\n` fires twice, so empty lines are ignored. Commands: `led on`, `led off`, `led status`.
-
-## Coming from the TM4C123
-
-On the TM4C I computed the baud divisor by hand into `UARTIBRD` and `UARTFBRD`, set the frame in `UARTLCRH`, and polled `UARTFR` before every byte into `UARTDR`. Here `uart_param_config()` does the divisor math and the driver replaces polling with an interrupt fed ring buffer. Knowing the divisor exists underneath is what makes baud error a real concept.
 
 ## Results
 

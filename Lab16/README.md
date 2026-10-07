@@ -27,10 +27,6 @@ Causing the most-asked RTOS interview problem on purpose, timing it, and fixing 
 - **The actual difference.** A mutex is owned, taken and given by the same task, and protects a resource. A semaphore is a signal, given by one task or ISR and taken by another. That is why Lab 7 correctly uses semaphores.
 - **Making it deterministic.** Each trial is sequenced with task notifications, not sleeps, so the order lock, block, preempt is forced every time.
 
-## Coming from the TM4C123
-
-No scheduler, so no task priorities to invert. The closest thing was NVIC interrupt priorities, but ISRs do not hold locks across preemption.
-
 ## Results
 
 | | Binary semaphore | Mutex |

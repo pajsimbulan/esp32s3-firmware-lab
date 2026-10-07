@@ -2,7 +2,7 @@
 
 Hardware PWM. Why duty resolution and frequency trade against each other as plain arithmetic, why a duty change needs a latch, and handing a whole fade to the hardware.
 
-[![LED fading in and out on hardware PWM](screenshots/lab06_demo_led_pwm_fade_poster.jpg)](screenshots/lab06_demo_led_pwm_fade.mp4)
+<a href="screenshots/lab06_demo_led_pwm_fade.mp4"><img src="screenshots/lab06_demo_led_pwm_fade_poster.jpg" width="220" alt="LED fading in and out on hardware PWM"></a>
 
 *Click to play. An LED on GPIO4 breathing up and down, driven entirely by the LEDC hardware fade.*
 
@@ -22,10 +22,6 @@ Hardware PWM. Why duty resolution and frequency trade against each other as plai
 - **What matters depends on the load.** For an LED, more resolution matters, since coarse steps show as banding when dim. For a motor, frequency matters, so it sits above hearing range.
 - **The duty change needs two calls.** `ledc_set_duty()` writes a shadow register and `ledc_update_duty()` latches it at the next period boundary. That latch exists so a change never lands mid-pulse. Forgetting the second call is the classic bug: no error, and nothing changes.
 - **Hardware fade.** `ledc_set_fade_with_time()` gives the whole ramp to the peripheral. No task, no jitter, CPU free. This PWM output is what the controller in Lab 18 would drive.
-
-## Coming from the TM4C123
-
-The TM4C had a load register for the period and a compare register for the duty, and I worked out the load value from the system clock myself. LEDC is the same counter and compare idea. What is new is that resolution is an explicit setting, and the fade hardware has no TM4C equivalent.
 
 ## Results
 

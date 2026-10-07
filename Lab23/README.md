@@ -2,7 +2,7 @@
 
 How boards get tested on a production line. At boot the firmware opens a short window and listens for a magic word. If the test station sends it, the board runs its self-tests, reports each one, and the station logs a PASS or FAIL with the board's serial number. If nobody asks, the board boots normally.
 
-[![Station run: PASS, FAIL with SDA pulled, PASS again](screenshots/lab23_demo_factory_test_pass_fail_pass_poster.jpg)](screenshots/lab23_demo_factory_test_pass_fail_pass.mp4)
+<a href="screenshots/lab23_demo_factory_test_pass_fail_pass.mp4"><img src="screenshots/lab23_demo_factory_test_pass_fail_pass_poster.jpg" width="220" alt="Station run: PASS, FAIL with SDA pulled, PASS again"></a>
 
 *Click to play. Same board three times: PASS, FAIL after pulling the IMU's SDA wire, then PASS after putting it back.*
 
@@ -39,10 +39,6 @@ How boards get tested on a production line. At boot the firmware opens a short w
 ## What broke
 
 - **Every run timed out.** I was on COM3, which is the S3's native USB port and only carried the console output here. The station's `TESTMODE` never reached the UART. COM8, the USB-UART bridge, was the right port.
-
-## Coming from the TM4C123
-
-Never part of a class lab. On a real product every board goes through a station like this before it ships.
 
 ## Run
 

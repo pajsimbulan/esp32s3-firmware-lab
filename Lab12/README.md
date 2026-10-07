@@ -24,10 +24,6 @@ Putting the chip into deep sleep, waking it on a timer, and keeping a counter al
 - **Wake sources.** A timer here. A GPIO wake needs an RTC-capable pin, because the normal GPIO matrix is powered down.
 - **Battery life is a duty cycle.** Short active spikes over a long low floor. Average current from the ratio, then divide the battery capacity by it.
 
-## Coming from the TM4C123
-
-The TM4C sleep modes halt the CPU with `WFI` and resume on the next instruction with everything intact, which is closer to light sleep here. Deep sleep as a full power domain shutdown, where the app has to be designed around losing its memory, is new.
-
 ## Results
 
 | Check | Result |

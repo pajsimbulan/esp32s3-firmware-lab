@@ -20,10 +20,6 @@ The data side of an embedded ML project. Before any model can run on a microcont
 - **Sessions.** `SESSION_ID` is a build flag, so captures from different runs can be merged into one dataset and still be told apart.
 - **Labeling with one button.** No host tool needed. The label is read from BOOT at the end of each window, so the person shaking the board decides the label in real time.
 
-## Coming from the TM4C123
-
-The ECE 425 labs read sensors and printed values. This adds the next step: structured, labeled output meant to be consumed by another program rather than read by a person.
-
 ## Scope
 
 This lab produces the dataset. Training a model and deploying it on the device is the next step and is not in this repo.

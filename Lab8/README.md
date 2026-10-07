@@ -34,10 +34,6 @@ An edge interrupt on a real button, an ISR that only posts an event, and a worke
 
 Pressing Enter on an empty `(gdb)` line repeats the last command, which once sent me straight past `app_main` into the idle task. That stop was useful too: the idle task sitting in `esp_cpu_wait_for_intr()` is exactly what a sleeping CPU looks like.
 
-## Coming from the TM4C123
-
-The TM4C version was raw NVIC work: pick the edge in `GPIOIS`, `GPIOIBE` and `GPIOIEV`, enable it in `GPIOIM` and `NVIC_EN0`, and clear the flag in `GPIOICR` or the interrupt fires forever. Deferring meant setting a global flag and hoping the superloop noticed. Here the ISR can wake a specific task at a specific priority.
-
 ## Results
 
 | Check | Result |

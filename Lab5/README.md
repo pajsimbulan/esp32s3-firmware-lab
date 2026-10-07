@@ -2,7 +2,7 @@
 
 Bringing up a real sensor from its datasheet. Reading the device ID, waking the part, setting its range, and turning raw big-endian register pairs into signed acceleration in g. Written against the register map, not a sensor library.
 
-[![Tilting the MPU while the log and the I2C capture update](screenshots/lab05_demo_mpu_tilt_with_i2c_capture_poster.jpg)](screenshots/lab05_demo_mpu_tilt_with_i2c_capture.mp4)
+<a href="screenshots/lab05_demo_mpu_tilt_with_i2c_capture.mp4"><img src="screenshots/lab05_demo_mpu_tilt_with_i2c_capture_poster.jpg" width="220" alt="Tilting the MPU while the log and the I2C capture update"></a>
 
 *Click to play. Tilting the IMU changes the ax, ay, az values in the log, with the logic analyzer tapped onto SDA and SCL.*
 
@@ -29,10 +29,6 @@ Bringing up a real sensor from its datasheet. Reading the device ID, waking the 
   3. Set the accelerometer range (`0x1C`).
   4. Burst read 6 bytes from `0x3B` for all three axes in one transaction.
 - **Rebuilding the numbers.** Each axis is a big-endian signed 16-bit value, so it is `(int16_t)((hi << 8) | lo)`, then divide by the LSB per g for the range. Sanity check: a still board reads about 1 g on the vertical axis.
-
-## Coming from the TM4C123
-
-ECE 425 drove I2C through `I2CMSA`, `I2CMDR` and `I2CMCS` by hand, one byte at a time, writing the START, RUN, STOP and ACK bits for each phase. The ESP-IDF driver builds that state machine for me, but the waveform is identical, and being able to name every part of a capture (start, address, ACK, repeated start, stop) is what the register work paid for.
 
 ## Results
 

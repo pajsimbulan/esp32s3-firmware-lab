@@ -23,10 +23,6 @@ Getting data off the device. Event-driven Wi-Fi bring-up, then an HTTP client po
 - **Disconnects happen.** `WIFI_EVENT_STA_DISCONNECTED` fires whenever the link drops, and the device has to reconnect on its own. That is the difference between a demo and a product.
 - **The POST.** Build the JSON body, set `Content-Type: application/json`, perform, read the status code, and always clean up the client so nothing leaks per transmission.
 
-## Coming from the TM4C123
-
-The ECE 425 final used an HM-10 Bluetooth module over UART, so the network was just a serial port and the module did everything above it. Here the whole stack runs on the chip: MAC, LwIP, DHCP, TCP and HTTP.
-
 ## Results
 
 | Check | Result |

@@ -2,7 +2,7 @@
 
 Labs 2 through 5 put together into one sensor node design. A hardware timer paces sampling, a sampler task reads the IMU at a fixed rate into a window, a feature task computes RMS and peak per window, and the result goes out a UART. Acquire, process, report.
 
-[![Moving the IMU while RMS and the UART loopback update](screenshots/lab07_demo_vibration_rms_with_uart_log_poster.jpg)](screenshots/lab07_demo_vibration_rms_with_uart_log.mp4)
+<a href="screenshots/lab07_demo_vibration_rms_with_uart_log.mp4"><img src="screenshots/lab07_demo_vibration_rms_with_uart_log_poster.jpg" width="220" alt="Moving the IMU while RMS and the UART loopback update"></a>
 
 *Click to play. Shaking the IMU makes RMS and peak jump. Each result is also sent out UART1 and read back through a loopback wire.*
 
@@ -37,10 +37,6 @@ feature_task   RMS and peak over the window, log it, send it out UART1
 ## Known limitation, left on purpose
 
 There is one window buffer shared by both tasks. Nothing stops the sampler from overwriting it while the feature task reads. At these rates the math finishes well inside one window, so it does not show, but it is a real race. Lab 22 fixes the same problem properly with two buffers and an ownership rule.
-
-## Coming from the TM4C123
-
-The ECE 425 version would be one ISR that reads the sensor, updates a global and sets a flag for the main loop. It works until any stage takes variable time, because there is nowhere to defer the work to. Here there is.
 
 ## Results
 

@@ -2,7 +2,7 @@
 
 Digital input and output on the ESP32-S3. Reading an active-low button with debounce, and driving an addressable WS2812 LED whose timing is generated in hardware by the RMT peripheral.
 
-[![Pressing BOOT cycles the RGB LED](screenshots/lab01_demo_boot_button_cycles_rgb_led_poster.jpg)](screenshots/lab01_demo_boot_button_cycles_rgb_led.mp4)
+<a href="screenshots/lab01_demo_boot_button_cycles_rgb_led.mp4"><img src="screenshots/lab01_demo_boot_button_cycles_rgb_led_poster.jpg" width="220" alt="Pressing BOOT cycles the RGB LED"></a>
 
 *Click to play. Each press of the BOOT button moves the onboard RGB LED to the next color.*
 
@@ -23,10 +23,6 @@ Digital input and output on the ESP32-S3. Reading an active-low button with debo
 - **`1ULL << pin`, not `1 << pin`.** GPIO48 is past bit 31, so a 32-bit shift is undefined and quietly configures the wrong pin.
 - **The LED is a serial device, not three LEDs.** The WS2812 encodes each bit as a pulse width, with 1 and 0 a few hundred nanoseconds apart. A FreeRTOS task cannot toggle a pin that precisely, so the RMT peripheral clocks the waveform out in hardware.
 - **Set, then refresh.** `led_strip_set_pixel()` only writes RAM. `led_strip_refresh()` sends it. Describe the state, then commit it. The same pattern comes back with the display in Lab 22.
-
-## Coming from the TM4C123
-
-Bringing up a pin used to be five register writes by hand: clock gate in `RCGCGPIO`, wait on `PRGPIO`, direction in `GPIODIR`, digital enable in `GPIODEN`, pull-up in `GPIOPUR`. `gpio_config()` does the same work in one call. The new idea is the **GPIO matrix**, which can route almost any peripheral to almost any pin instead of a fixed alternate function table.
 
 ## Results
 

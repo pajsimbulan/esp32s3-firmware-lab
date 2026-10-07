@@ -2,7 +2,7 @@
 
 Driving a 240x320 TFT over SPI with DMA. One buffer is filled while the other is on the wire, so the CPU and the bus work at the same time. Then I measured the frame rate and checked it against the math.
 
-[![A photo drawn on the TFT over SPI DMA](screenshots/lab22_demo_tft_image_over_spi_dma_poster.jpg)](screenshots/lab22_demo_tft_image_over_spi_dma.mp4)
+<a href="screenshots/lab22_demo_tft_image_over_spi_dma.mp4"><img src="screenshots/lab22_demo_tft_image_over_spi_dma_poster.jpg" width="220" alt="A photo drawn on the TFT over SPI DMA"></a>
 
 *Click to play. An image converted to RGB565 on the laptop, stored in flash, and pushed to the display in stripes.*
 
@@ -30,10 +30,6 @@ Driving a 240x320 TFT over SPI with DMA. One buffer is filled while the other is
 - **Ping-pong.** While DMA sends stripe A, the CPU fills stripe B. Then they swap. The fill time hides under the transfer time.
 - **D/C is a GPIO.** The ST7789 uses one pin to tell commands from pixel data. A pre-transfer callback sets it per transaction.
 - **Byte order.** RGB565 goes out high byte first. Getting it backwards gives wrong but stable colors, which is a useful clue.
-
-## Coming from the TM4C123
-
-ECE 425 drove a character LCD with GPIO writes. A graphic display at this size is impossible without DMA, so this is the lab where DMA stopped being optional.
 
 ## Results
 

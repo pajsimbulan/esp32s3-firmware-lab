@@ -45,10 +45,6 @@ Anti-windup cut overshoot from 14.6 to 2.5 with the same gains, plant and limits
 
 The plant is simulated on purpose. That is a demonstration of the algorithm and its failure modes, not tuning a real motor, and those are different claims.
 
-## Coming from the TM4C123
-
-No control theory in ECE 425. What carries over is fixed-rate execution from a timer and PWM as the actuator (Lab 6).
-
 ## What broke
 
 - **The anti-windup check was inverted and made things worse.** It integrated only while saturated, the exact opposite of the fix. It still converged and looked plausible, it just overshot more than no protection at all. I caught it by comparing the three runs and seeing the order was wrong: the protected case cannot be worse than the unprotected one. Control code fails quietly.

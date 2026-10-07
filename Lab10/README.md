@@ -23,10 +23,6 @@ Keeping state across resets and power loss. A log-structured key/value store on 
 - **The init idiom.** `nvs_flash_init()` can return `NO_FREE_PAGES` or `NEW_VERSION_FOUND`. Both are fixed by erasing and initializing again, and both are silent failures if you only check for `ESP_OK`.
 - **`nvs_commit()`.** Writes are buffered until committed. Same class of bug as forgetting `ledc_update_duty()` in Lab 6.
 
-## Coming from the TM4C123
-
-The TM4C had a small internal EEPROM with a word-addressed API that handled erase-before-write inside the peripheral. No keys, no namespaces, no partition table. NVS adds all of that on top of raw flash, and the idea that carries over is that non-volatile memory has erase granularity and limited life.
-
 ## Results
 
 | Check | Result |

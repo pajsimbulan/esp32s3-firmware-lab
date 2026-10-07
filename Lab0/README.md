@@ -23,10 +23,6 @@ Setting up ESP-IDF from scratch and proving the whole build, flash and monitor l
 - **A project is a CMake project.** The top `CMakeLists.txt` pulls in the IDF build system, `main/` is a component, and `sdkconfig` holds thousands of build options generated from `sdkconfig.defaults`.
 - **Flashing is three writes, not one.** The bootloader, the partition table and the app each go to their own flash offset. Knowing this makes the OTA and partition work in Lab 15 much less magic.
 
-## Coming from the TM4C123
-
-In ECE 425 the flow was Keil, a vendor project file and an ICDI probe, and `main()` really was the first thing to run. Here everything is command line and plain text (CMake, Ninja, GCC, esptool), and a lot more happens before my code starts. The upside is that the whole configuration is diffable and reproducible.
-
 ## Results
 
 | Check | Result |

@@ -22,10 +22,6 @@ Moving from a superloop to a preemptive RTOS. Two tasks with their own stacks an
 - **Blocking costs nothing.** `vTaskDelay()` puts the task to sleep and gives the CPU to whoever is ready. A busy wait burns the whole core doing nothing. That difference is the reason an RTOS exists.
 - **Drift.** `vTaskDelay(1000 ms)` means 1000 ms from now, so if the work took 8 ms the real period is 1008 ms, and the error piles up. `vTaskDelayUntil()` waits until an absolute tick, so the period stays exact. This lab runs a heartbeat on `vTaskDelayUntil` and a worker on `vTaskDelay` so both behaviors are in the same log.
 
-## Coming from the TM4C123
-
-ECE 425 was a superloop with SysTick and software delays. One thread of control, and interrupts were the only concurrency. FreeRTOS adds a scheduler, per-task stacks and priority preemption. Worth knowing for later jobs: tasks, queues, semaphores and mutexes are FreeRTOS, not Espressif, so this carries over to STM32, NXP and TI parts.
-
 ## Results
 
 | Check | Result |

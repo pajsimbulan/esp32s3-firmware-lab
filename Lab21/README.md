@@ -29,10 +29,6 @@ A bug that only shows up as a wrong number: a loop bound that changes on its own
 - **The value tells the story.** `0x41000000` is 8.0f, a float written into an integer.
 - **RTOS-aware GDB.** `info threads` lists FreeRTOS tasks. Thread 2's backtrace showed `main` paused inside `xTaskCreate` for `prod`. Since `prod` has a higher priority than `main`, it ran first and corrupted the struct before `cons` even existed.
 
-## Coming from the TM4C123
-
-Keil gave breakpoints and a register view. Watchpoints existed but I never needed one, because a single super loop rarely has a writer you cannot find by reading the code. With tasks, you can.
-
 ## Results
 
 | | Before | After |

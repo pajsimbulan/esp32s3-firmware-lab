@@ -2,7 +2,7 @@
 
 Updating firmware over Wi-Fi, and more importantly surviving a bad update. Two app slots, a probation state, an on-device self-test, and automatic rollback when the self-test fails. I captured both paths on the bench: a good v2 that commits, and a v2 that fails its self-test and rolls itself back to v1.
 
-[![OTA update from v1 to v2 with the laptop serving the image](screenshots/lab15_demo_ota_update_v1_to_v2_poster.jpg)](screenshots/lab15_demo_ota_update_v1_to_v2.mp4)
+<a href="screenshots/lab15_demo_ota_update_v1_to_v2.mp4"><img src="screenshots/lab15_demo_ota_update_v1_to_v2_poster.jpg" width="220" alt="OTA update from v1 to v2 with the laptop serving the image"></a>
 
 *Click to play (the quiet middle part is sped up). v1 downloads the new image from the laptop, reboots into the other slot, v2 passes its self-test, and the image is marked valid.*
 
@@ -43,10 +43,6 @@ boot: v1 running from ota_0
 ```
 
 The IMU was not plugged in, so v2 failed its own check and put v1 back with nobody touching the board. With the IMU wired, the same v2 logged `health: OK`, `selftest: PASS` and `image marked VALID`, and stayed on `ota_1`.
-
-## Coming from the TM4C123
-
-No equivalent. Updating a TM4C meant a probe and physical access. Every idea here exists because the device is somewhere you are not.
 
 ## Results
 
