@@ -140,14 +140,22 @@ static void start_advertising(void)
     fields.name_len = strlen(name);
     fields.name_is_complete = 1;
 
-    fields.uuids128 = (ble_uuid128_t *)&vib_svc_uuid;
-    fields.num_uuids128 = 1;
-    fields.uuids128_is_complete = 1;
-
+    // adv packet max is 31 bytes: flags(3) + tx power(3) + name(11) = 17 fits,
+    // adding the 128-bit UUID (18) would make 35, so it goes in the scan response
     int rc = ble_gap_adv_set_fields(&fields);
     if (rc != 0) {
-        // 31 bytes total. name + a 128-bit UUID is most of it.
         ESP_LOGE(TAG, "adv_set_fields rc=%d (payload too big?)", rc);
+        return;
+    }
+
+    struct ble_hs_adv_fields rsp;
+    memset(&rsp, 0, sizeof(rsp));
+    rsp.uuids128 = (ble_uuid128_t *)&vib_svc_uuid;
+    rsp.num_uuids128 = 1;
+    rsp.uuids128_is_complete = 1;
+    rc = ble_gap_adv_rsp_set_fields(&rsp);
+    if (rc != 0) {
+        ESP_LOGE(TAG, "adv_rsp_set_fields rc=%d", rc);
         return;
     }
 
