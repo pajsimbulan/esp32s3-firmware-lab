@@ -6,7 +6,7 @@
 #include "esp_timer.h"
 #include "esp_log.h"
 
-#define USE_MUTEX 1 //0 = Part A (binary sempahore), 1 =  Part B (mutex)
+#define USE_MUTEX 0 //0 = Part A (binary sempahore), 1 =  Part B (mutex)
 #define CORE 0 // pin everything to ONE core
 #define HOLD_MS 300 //LOW
 #define MED_MS 500 //MED
