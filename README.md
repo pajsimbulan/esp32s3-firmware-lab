@@ -20,7 +20,7 @@ This is one of my two firmware projects. I did this series over the summer to re
 
 At CSUN, ECE 425 taught me embedded systems on the TI TM4C123: bare-metal C, registers, no operating system. I wanted the other half too. I picked the ESP32-S3 because it has everything in one cheap board: two cores, Wi-Fi, BLE, a CAN controller, a DMA engine shared by SPI, the ADC and other peripherals, 8 MB of PSRAM on the N16R8 module, and a built-in USB JTAG debugger. And ESP-IDF runs on FreeRTOS, so every lab doubled as RTOS practice next to the bare-metal work I was doing at university. The labs use the ESP-IDF drivers, so the focus is on how each peripheral and the RTOS behave. Writing my own register-level drivers came later, in Oscil.
 
-The format is a love letter to classroom labs. Each one has a goal, a build, a measurement and a write-up of what went wrong. A semester usually has 8 to 12 labs. This has 24, and the second half goes well past what a class covers: CAN, OTA with rollback, priority inversion, DMA, hardware watchpoints, and a factory test station.
+The format is a love letter to the classroom labs I learned from. Each one has a goal, a build, a measurement and a write-up of what went wrong. The series starts alongside my coursework, then builds past it. The first ten labs overlap with the fundamentals from class on a new chip, and the rest cover CAN, OTA with rollback, priority inversion, DMA, hardware watchpoints, and a factory test station.
 
 Every lab README has a **What broke** section, because the bugs are where most of the learning happened.
 
@@ -38,13 +38,13 @@ Every lab README has a **What broke** section, because the bugs are where most o
 | 5 | [I2C and an IMU](Lab5) | Address probe, `WHO_AM_I`, burst reads, raw to g |
 | 6 | [PWM with LEDC](Lab6) | Duty vs resolution vs frequency, a task-driven LED fade |
 | 7 | [Sensor pipeline](Lab7) | Producer and consumer tasks, semaphores, RMS and peak |
+| 8 | [Interrupts and crash dumps](Lab8) | ISR rules, `IRAM_ATTR`, queue to a task, reading a panic, GDB in the ISR |
+| 9 | [SPI master](Lab9) | Full duplex, chip select, SPI modes, loopback decoded `DEADBEEF` |
 
-### Past the coursework
+### Building on the coursework
 
 | # | Lab | What it shows |
 |---|---|---|
-| 8 | [Interrupts and crash dumps](Lab8) | ISR rules, `IRAM_ATTR`, queue to a task, reading a panic, GDB in the ISR |
-| 9 | [SPI master](Lab9) | Full duplex, chip select, SPI modes, loopback decoded `DEADBEEF` |
 | 10 | [NVS storage](Lab10) | Key value storage that survives reset, partition tables |
 | 11 | [Unit tests on the target](Lab11) | Unity tests running on the chip, logic split from hardware |
 | 12 | [Deep sleep](Lab12) | Wake sources, RTC memory, power domains |
